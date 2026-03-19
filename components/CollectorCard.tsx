@@ -1,53 +1,45 @@
-// 1. EL CONTRATO (Interface)
-// Aquí definimos qué necesita este molde para funcionar.
-// Es como decirle a la fábrica: "Para hacer esta tarjeta, necesito obligatoriamente un titulo, serie y rareza".
 interface CardProps {
-  titulo: string;
-  serie: string;
+  modelo: string;
+  marca: string;
   rareza: string;
+  valor: number;
 }
 
-// 2. EL COMPONENTE (Función)
-// Esta función recibe los datos (props) y devuelve el diseño visual.
-export default function CollectorCard({ titulo, serie, rareza }: CardProps) {
-  
+export default function CollectorCard({ modelo, marca, rareza, valor }: CardProps) {
   return (
-    // CONTENEDOR PRINCIPAL
-    // Clases de Tailwind explicadas:
-    // w-80: Ancho fijo
-    // rounded-xl: Bordes redondeados
-    // border-slate-700: Color del borde gris oscuro
-    // bg-slate-800: Fondo de la tarjeta
-    // hover:border-blue-500: Al pasar el mouse, el borde se pone azul
-    <div className="w-80 rounded-xl border border-slate-700 bg-slate-800 p-4 shadow-lg hover:border-blue-500 transition-all cursor-pointer group">
+    // Diseño Frío, Oscuro y Minimalista. 
+    // border-slate-800/50 da un borde súper sutil. hover:border-cyan-900 le da ese toque "frío" al pasar el mouse.
+    <div className="w-full flex flex-col bg-[#0b1120] border border-slate-800/50 rounded-2xl overflow-hidden hover:shadow-[0_0_15px_rgba(8,145,178,0.15)] hover:border-cyan-900/50 transition-all duration-300 group cursor-pointer">
       
-      {/* ZONA DE FOTO (Simulada) */}
-      <div className="h-40 w-full rounded-lg bg-slate-700 flex items-center justify-center mb-4 group-hover:bg-slate-600 transition-colors">
-        <span className="text-slate-500 font-medium">Foto del Auto</span>
+      {/* Zona de la Foto (Minimalista, fondo gris azulado oscuro) */}
+      <div className="h-48 w-full bg-slate-900/50 flex items-center justify-center relative overflow-hidden">
+        {/* Aquí luego irá la foto real (LINK_IMG) */}
+        <span className="text-slate-600 text-sm font-medium tracking-widest uppercase group-hover:text-cyan-600/50 transition-colors">
+          Sin Imagen
+        </span>
       </div>
 
-      {/* TÍTULO */}
-      <h3 className="text-xl font-bold text-white mb-1">
-        {titulo}
-      </h3>
-
-      {/* DETALLES */}
-      <div className="text-sm text-slate-400">
-        <p>Serie: {serie}</p>
-        
-        {/* LÓGICA VISUAL (Operador Ternario) */}
-        {/* Si rareza es 'STH', fondo amarillo. Si no, gris. */}
-        <span className={`inline-block mt-3 px-2 py-1 rounded text-xs font-bold 
-        ${
-            rareza === 'STH' 
-              ? 'bg-yellow-500 text-black'    // Estilo para Super Treasure Hunt
-              : rareza === 'TH' 
-              ? 'bg-blue-500 text-black'    // Estilo para Treasure Hunt
-              : 'bg-slate-600 text-white'     // Estilo normal
-        }
-        `}>
-          {rareza}
+      {/* Detalles del Auto */}
+      <div className="p-5 flex flex-col gap-2">
+        {/* Marca (Sutil) */}
+        <span className="text-xs font-semibold text-cyan-500 tracking-wider uppercase">
+          {marca}
         </span>
+        
+        {/* Modelo (Protagonista, blanco puro) */}
+        <h3 className="text-xl font-bold text-slate-100 truncate">
+          {modelo}
+        </h3>
+
+        {/* Footer de la tarjeta: Rareza y Valor */}
+        <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-800/50">
+          <span className="text-xs font-medium px-2 py-1 rounded bg-slate-800 text-slate-300">
+            {rareza}
+          </span>
+          <span className="text-sm font-bold text-emerald-400">
+            ${valor}
+          </span>
+        </div>
       </div>
     </div>
   );
