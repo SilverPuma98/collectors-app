@@ -47,9 +47,21 @@ export default function Navbar() {
           </div>
           <div className="flex gap-4 items-center">
             {usuario ? (
+              /* ESTADO: USUARIO LOGUEADO */
               <>
-                <Link href="/admin" className="text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition-colors">Panel Admin</Link>
-                <button onClick={handleLogout} className="text-sm font-bold bg-slate-800 hover:bg-red-900/80 text-slate-300 hover:text-white px-4 py-2 rounded-md transition-all border border-slate-700 hover:border-red-800">Salir</button>
+                <Link href="/mi-garaje" className="text-sm font-semibold text-white hover:text-cyan-300 transition-colors">
+                  Mi Garaje
+                </Link>
+                {/* El botón de Panel Admin solo se mostrará aquí si quieres, aunque ya está protegido */}
+                <Link href="/admin" className="text-sm font-semibold text-cyan-400 hover:text-cyan-300 transition-colors">
+                  Panel Admin
+                </Link>
+                <button 
+                  onClick={handleLogout}
+                  className="text-sm font-bold bg-slate-800 hover:bg-red-900/80 text-slate-300 hover:text-white px-4 py-2 rounded-md transition-all border border-slate-700 hover:border-red-800"
+                >
+                  Salir
+                </button>
               </>
             ) : (
               <>
