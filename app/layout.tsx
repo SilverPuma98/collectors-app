@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+import './globals.css'; // <-- ESTA LÍNEA ES VITAL
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+//
 
 // Importamos tus nuevos componentes
 import Navbar from "@/components/Navbar";

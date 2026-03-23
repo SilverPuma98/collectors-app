@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation"; // Herramienta profesional para redirigir
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -11,13 +11,11 @@ export default function LoginPage() {
   const [cargando, setCargando] = useState(false);
   const router = useRouter();
 
-  // Función EXCLUSIVA para Iniciar Sesión
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setCargando(true);
-    setMensaje("Verificando credenciales encriptadas...");
+    setMensaje("Verificando credenciales seguras...");
 
-    // Intentamos iniciar sesión con Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -25,12 +23,18 @@ export default function LoginPage() {
 
     if (error) {
       setMensaje("❌ Acceso denegado: Credenciales incorrectas.");
+      setCargando(false);
     } else {
-      setMensaje("✅ ¡Bienvenido, Administrador!");
-      // Redirección profesional al panel de control
-      router.push("/admin"); 
+      setMensaje("✅ ¡Bienvenido! Preparando bóveda...");
+      
+      // 1. REFRESCAMOS EL SERVIDOR: Esto sincroniza las cookies con el Middleware
+      router.refresh(); 
+
+      // 2. Le damos 500ms al servidor para asimilar la cookie antes de redirigir
+      setTimeout(() => {
+        router.push("/admin"); 
+      }, 500);
     }
-    setCargando(false);
   };
 
   return (
@@ -45,11 +49,13 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-5">
+          {/* Corregido: Accesibilidad con htmlFor e id */}
           <div>
-            <label className="block text-xs font-semibold text-cyan-500 uppercase tracking-wider mb-2">
+            <label htmlFor="email" className="block text-xs font-semibold text-cyan-500 uppercase tracking-wider mb-2">
               Correo Electrónico
             </label>
             <input
+              id="email"
               type="email"
               required
               value={email}
@@ -60,10 +66,11 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-cyan-500 uppercase tracking-wider mb-2">
+            <label htmlFor="password" className="block text-xs font-semibold text-cyan-500 uppercase tracking-wider mb-2">
               Contraseña de Seguridad
             </label>
             <input
+              id="password"
               type="password"
               required
               value={password}
