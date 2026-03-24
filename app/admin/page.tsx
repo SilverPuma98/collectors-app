@@ -20,7 +20,7 @@ export default function AdminDashboard() {
   const [escalas, setEscalas] = useState<any[]>([]);
   const [estadosCarro, setEstadosCarro] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]); 
-  const [coches, setCoches] = useState<any[]>([]); // <-- Ahora traemos TODOS los coches
+  const [coches, setCoches] = useState<any[]>([]);
 
   // ESTADOS DE UI
   const [modalAbierto, setModalAbierto] = useState<string | null>(null);
@@ -63,7 +63,6 @@ export default function AdminDashboard() {
       supabase.from('rareza').select('*').order('id_rareza', { ascending: true }),
       supabase.from('escala').select('*').order('id_escala', { ascending: true }),
       supabase.from('estado_carro').select('*').order('id_estado_carro', { ascending: true }),
-      // Traemos TODOS los coches para poder ver el catálogo completo y moderar
       supabase.from('carro').select('*, marca(marca), serie(serie)').order('estado_aprobacion', { ascending: false })
     ]);
 
@@ -111,14 +110,45 @@ export default function AdminDashboard() {
   };
 
   // ==========================================
-  // FUNCIONES DE GUARDADO (CRUD)
+  // FUNCIONES DE GUARDADO (CRUD) - A PRUEBA DE FALLOS
   // ==========================================
-  const guardarMarca = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); if (itemEditando) await supabase.from('marca').update({ marca: nuevaMarca }).eq('id_marca', itemEditando.id_marca); else await supabase.from('marca').insert([{ marca: nuevaMarca }]); await cargarTodosLosDatos(miRol); setModalAbierto(null); setCargando(false); };
-  const guardarFabricante = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); if (itemEditando) await supabase.from('fabricante').update({ fabricante: nuevoFabricante }).eq('id_fabricante', itemEditando.id_fabricante); else await supabase.from('fabricante').insert([{ fabricante: nuevoFabricante }]); await cargarTodosLosDatos(miRol); setModalAbierto(null); setCargando(false); };
-  const guardarSerie = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); const payload = { serie: nuevaSerie.serie, anio: parseInt(nuevaSerie.anio) || null, no_carros: parseInt(nuevaSerie.no_carros) || null, id_fabricante: parseInt(nuevaSerie.id_fabricante) }; if (itemEditando) await supabase.from('serie').update(payload).eq('id_serie', itemEditando.id_serie); else await supabase.from('serie').insert([payload]); await cargarTodosLosDatos(miRol); setModalAbierto(null); setCargando(false); };
-  const guardarRareza = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); const payload = { rareza: nuevaRareza.rareza, id_fabricante: parseInt(nuevaRareza.id_fabricante) }; if (itemEditando) await supabase.from('rareza').update(payload).eq('id_rareza', itemEditando.id_rareza); else await supabase.from('rareza').insert([payload]); await cargarTodosLosDatos(miRol); setModalAbierto(null); setCargando(false); };
-  const guardarEscala = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); if (itemEditando) await supabase.from('escala').update({ escala: nuevaEscala }).eq('id_escala', itemEditando.id_escala); else await supabase.from('escala').insert([{ escala: nuevaEscala }]); await cargarTodosLosDatos(miRol); setModalAbierto(null); setCargando(false); };
-  const guardarEstadoCarro = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); if (itemEditando) await supabase.from('estado_carro').update({ estado_carro: nuevoEstadoCarro }).eq('id_estado_carro', itemEditando.id_estado_carro); else await supabase.from('estado_carro').insert([{ estado_carro: nuevoEstadoCarro }]); await cargarTodosLosDatos(miRol); setModalAbierto(null); setCargando(false); };
+  const guardarMarca = async (e: React.FormEvent) => { 
+    e.preventDefault(); setCargando(true); 
+    const { error } = itemEditando ? await supabase.from('marca').update({ marca: nuevaMarca }).eq('id_marca', itemEditando.id_marca) : await supabase.from('marca').insert([{ marca: nuevaMarca }]); 
+    if (error) alert("Error al guardar: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); 
+  };
+  
+  const guardarFabricante = async (e: React.FormEvent) => { 
+    e.preventDefault(); setCargando(true); 
+    const { error } = itemEditando ? await supabase.from('fabricante').update({ fabricante: nuevoFabricante }).eq('id_fabricante', itemEditando.id_fabricante) : await supabase.from('fabricante').insert([{ fabricante: nuevoFabricante }]); 
+    if (error) alert("Error al guardar: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); 
+  };
+  
+  const guardarSerie = async (e: React.FormEvent) => { 
+    e.preventDefault(); setCargando(true); 
+    const payload = { serie: nuevaSerie.serie, anio: parseInt(nuevaSerie.anio) || null, no_carros: parseInt(nuevaSerie.no_carros) || null, id_fabricante: parseInt(nuevaSerie.id_fabricante) }; 
+    const { error } = itemEditando ? await supabase.from('serie').update(payload).eq('id_serie', itemEditando.id_serie) : await supabase.from('serie').insert([payload]); 
+    if (error) alert("Error al guardar: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); 
+  };
+  
+  const guardarRareza = async (e: React.FormEvent) => { 
+    e.preventDefault(); setCargando(true); 
+    const payload = { rareza: nuevaRareza.rareza, id_fabricante: parseInt(nuevaRareza.id_fabricante) }; 
+    const { error } = itemEditando ? await supabase.from('rareza').update(payload).eq('id_rareza', itemEditando.id_rareza) : await supabase.from('rareza').insert([payload]); 
+    if (error) alert("Error al guardar: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); 
+  };
+  
+  const guardarEscala = async (e: React.FormEvent) => { 
+    e.preventDefault(); setCargando(true); 
+    const { error } = itemEditando ? await supabase.from('escala').update({ escala: nuevaEscala }).eq('id_escala', itemEditando.id_escala) : await supabase.from('escala').insert([{ escala: nuevaEscala }]); 
+    if (error) alert("Error al guardar: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); 
+  };
+  
+  const guardarEstadoCarro = async (e: React.FormEvent) => { 
+    e.preventDefault(); setCargando(true); 
+    const { error } = itemEditando ? await supabase.from('estado_carro').update({ estado_carro: nuevoEstadoCarro }).eq('id_estado_carro', itemEditando.id_estado_carro) : await supabase.from('estado_carro').insert([{ estado_carro: nuevoEstadoCarro }]); 
+    if (error) alert("Error al guardar: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); 
+  };
 
   const eliminarRegistro = async (tabla: string, columnaId: string, id: number) => {
     if (miRol !== 'SUPER_ADMIN') { alert("Solo los Súper Administradores pueden eliminar."); return; }
@@ -300,21 +330,22 @@ export default function AdminDashboard() {
       </div>
 
       {/* =========================================================================
-          MODALES COMPLETOS RESTAURADOS
+          MODALES DE EDICIÓN Y CREACIÓN
           ========================================================================= */}
       {modalAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl w-full max-w-sm">
             <h3 className="text-lg font-bold text-white mb-4 capitalize">{itemEditando ? `Editar ${modalAbierto}` : `Nuevo ${modalAbierto}`}</h3>
             
-            <form onSubmit={
-              modalAbierto === 'marca' ? guardarMarca :
-              modalAbierto === 'fabricante' ? guardarFabricante :
-              modalAbierto === 'serie' ? guardarSerie :
-              modalAbierto === 'rareza' ? guardarRareza :
-              modalAbierto === 'escala' ? guardarEscala :
-              guardarEstadoCarro
-            } className="flex flex-col gap-4">
+            {/* ESTE FORMULARIO AHORA ATRAPA ERRORES Y SABE EXACTAMENTE QUÉ FUNCIÓN LLAMAR */}
+            <form onSubmit={(e) => {
+              if (modalAbierto === 'marca') guardarMarca(e);
+              else if (modalAbierto === 'fabricante') guardarFabricante(e);
+              else if (modalAbierto === 'serie') guardarSerie(e);
+              else if (modalAbierto === 'rareza') guardarRareza(e);
+              else if (modalAbierto === 'escala') guardarEscala(e);
+              else if (modalAbierto === 'estado') guardarEstadoCarro(e);
+            }} className="flex flex-col gap-4">
               
               {modalAbierto === 'marca' && <input type="text" required placeholder="Nombre de la marca" value={nuevaMarca} onChange={(e) => setNuevaMarca(e.target.value)} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none" />}
               
@@ -326,21 +357,21 @@ export default function AdminDashboard() {
               
               {modalAbierto === 'serie' && (
                 <>
-                  <select required value={nuevaSerie.id_fabricante} onChange={(e) => setNuevaSerie({...nuevaSerie, id_fabricante: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none">
+                  <select required value={nuevaSerie.id_fabricante} onChange={(e) => setNuevaSerie({...nuevaSerie, id_fabricante: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none cursor-pointer">
                     <option value="">-- Selecciona Fabricante --</option>
                     {fabricantes.map(f => <option key={f.id_fabricante} value={f.id_fabricante}>{f.fabricante}</option>)}
                   </select>
                   <input type="text" required placeholder="Nombre de la serie" value={nuevaSerie.serie} onChange={(e) => setNuevaSerie({...nuevaSerie, serie: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none" />
                   <div className="flex gap-2">
                     <input type="number" placeholder="Año" value={nuevaSerie.anio} onChange={(e) => setNuevaSerie({...nuevaSerie, anio: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none" />
-                    <input type="number" placeholder="Total de Autos" value={nuevaSerie.no_carros} onChange={(e) => setNuevaSerie({...nuevaSerie, no_carros: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none" />
+                    <input type="number" placeholder="Total Autos" value={nuevaSerie.no_carros} onChange={(e) => setNuevaSerie({...nuevaSerie, no_carros: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none" />
                   </div>
                 </>
               )}
 
               {modalAbierto === 'rareza' && (
                 <>
-                  <select required value={nuevaRareza.id_fabricante} onChange={(e) => setNuevaRareza({...nuevaRareza, id_fabricante: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none">
+                  <select required value={nuevaRareza.id_fabricante} onChange={(e) => setNuevaRareza({...nuevaRareza, id_fabricante: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none cursor-pointer">
                     <option value="">-- Selecciona Fabricante --</option>
                     {fabricantes.map(f => <option key={f.id_fabricante} value={f.id_fabricante}>{f.fabricante}</option>)}
                   </select>
@@ -350,7 +381,7 @@ export default function AdminDashboard() {
 
               <div className="flex justify-end gap-3 mt-4">
                 <button type="button" onClick={() => setModalAbierto(null)} className="text-slate-400 p-2 font-bold">Cancelar</button>
-                <button type="submit" disabled={cargando} className="bg-cyan-700 text-white px-4 py-2 rounded-md font-bold">{cargando ? "Guardando..." : "Guardar"}</button>
+                <button type="submit" disabled={cargando} className="bg-cyan-700 hover:bg-cyan-600 text-white px-4 py-2 rounded-md font-bold transition-colors">{cargando ? "Guardando..." : "Guardar"}</button>
               </div>
             </form>
           </div>
