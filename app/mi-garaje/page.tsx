@@ -123,7 +123,7 @@ export default function MiGaraje() {
       serie: idSer,  
       rareza: nuevoCarro.rareza, 
       valor: parseFloat(nuevoCarro.valor) || 0,
-      link_img: imagenUrlFinal,
+      imagen_url: imagenUrlFinal,
       estado_aprobacion: (miPerfil.rol === 'SUPER_ADMIN' || miPerfil.rol === 'COLABORADOR') ? 'APROBADO' : 'PENDIENTE'
     };
 
