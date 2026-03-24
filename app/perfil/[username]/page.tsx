@@ -52,7 +52,7 @@ export default async function PerfilPublico({ params }: { params: Promise<{ user
   const [resCarros, resTrofeos] = await Promise.all([
     supabase
       .from('carro')
-      .select('*, marca(marca), serie(serie)')
+      .select('*, imagen_url, marca(marca), serie(serie)')
       .eq('id_usuario', perfil.id_usuario)
       .order('id_carro', { ascending: false }),
     
