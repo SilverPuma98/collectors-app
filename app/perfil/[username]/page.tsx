@@ -133,7 +133,7 @@ export default async function PerfilPublico({ params }: { params: Promise<{ user
                   marca={carro.marca?.marca || "Desconocida"}
                   rareza={carro.rareza || "Estándar"}
                   valor={carro.valor}
-                  imagenUrl={carro.link_img}
+                  imagenUrl={carro.imagen_url}
                 />
               ))}
             </div>
