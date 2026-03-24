@@ -200,7 +200,7 @@ export default function MiGaraje() {
                   marca={carro.marca?.marca || "Sin Marca"}
                   rareza={carro.rareza || "Común"}
                   valor={carro.valor}
-                  imagenUrl={carro.link_img}
+                  imagenUrl={carro.imagen_url}
                 />
               </div>
             ))}
