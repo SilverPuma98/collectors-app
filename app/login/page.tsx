@@ -3,100 +3,112 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [mensaje, setMensaje] = useState("");
-  const [cargando, setCargando] = useState(false);
+export default function Login() {
   const router = useRouter();
+  const [correo, setCorreo] = useState("");
+  const [contrasena, setContrasena] = useState("");
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setCargando(true);
-    setMensaje("Verificando credenciales seguras...");
+    setError(null);
 
+    // 1. Intentamos iniciar sesión con Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email: correo,
+      password: contrasena,
     });
 
     if (error) {
-      setMensaje("❌ Acceso denegado: Credenciales incorrectas.");
+      setError("Correo o contraseña incorrectos. Intenta de nuevo.");
       setCargando(false);
-    } else {
-      setMensaje("✅ ¡Bienvenido! Preparando bóveda...");
-      
-      // 1. REFRESCAMOS EL SERVIDOR: Esto sincroniza las cookies con el Middleware
-      router.refresh(); 
-
-      // 2. Le damos 500ms al servidor para asimilar la cookie antes de redirigir
-      setTimeout(() => {
-        router.push("/admin"); 
-      }, 500);
+      return;
     }
+
+    // 2. Si el login es exitoso, los mandamos al Panel unificado
+    // (El panel ya tiene la inteligencia para saber si es Admin o Usuario normal)
+    router.push("/mi-panel");
+    router.refresh();
   };
 
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-4 min-h-[70vh]">
-      <div className="w-full max-w-md bg-[#0b1120] border border-slate-800/80 rounded-2xl p-8 shadow-2xl">
-        
+    <main className="min-h-screen bg-[#050810] flex flex-col items-center justify-center p-4 selection:bg-cyan-900 selection:text-cyan-50 relative overflow-hidden">
+      
+      {/* Luces de fondo sutiles */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-900/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-900/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
+
+      <Link href="/" className="mb-8 text-3xl font-black text-white tracking-wider z-10 hover:scale-105 transition-transform">
+        COLLECTORS<span className="text-cyan-500">.</span>
+      </Link>
+
+      <div className="bg-[#0b1120] border border-cyan-900/30 p-8 md:p-10 rounded-3xl shadow-2xl max-w-md w-full z-10">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-white tracking-widest mb-2">
-            ZONA VIP<span className="text-cyan-500">.</span>
-          </h1>
-          <p className="text-slate-400 text-sm">Acceso exclusivo para administradores</p>
+          <h1 className="text-2xl font-bold text-white mb-2">Bienvenido de vuelta</h1>
+          <p className="text-sm text-slate-400">Inicia sesión para acceder a tu bóveda</p>
         </div>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-5">
-          {/* Corregido: Accesibilidad con htmlFor e id */}
-          <div>
-            <label htmlFor="email" className="block text-xs font-semibold text-cyan-500 uppercase tracking-wider mb-2">
-              Correo Electrónico
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 rounded-lg px-4 py-3 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
-              placeholder="admin@collectors.com"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-xs font-semibold text-cyan-500 uppercase tracking-wider mb-2">
-              Contraseña de Seguridad
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 rounded-lg px-4 py-3 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
-              placeholder="••••••••"
-            />
-          </div>
-
-          {mensaje && (
-            <div className={`text-sm text-center font-medium mt-2 py-2 rounded ${mensaje.includes('❌') ? 'text-red-400 bg-red-900/20' : 'text-emerald-400 bg-emerald-900/20'}`}>
-              {mensaje}
+          
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-bold p-3 rounded-xl text-center animate-in fade-in zoom-in duration-300">
+              {error}
             </div>
           )}
 
-          <div className="mt-4">
-            <button
-              type="submit"
-              disabled={cargando}
-              className="w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-3 rounded-lg transition-all shadow-[0_0_15px_rgba(8,145,178,0.3)] disabled:opacity-50"
-            >
-              {cargando ? "Desencriptando..." : "Acceder al Panel"}
-            </button>
+          <div>
+            <label className="text-xs text-cyan-600 font-bold uppercase tracking-wider mb-2 block">Correo Electrónico</label>
+            <input
+              type="email"
+              required
+              value={correo}
+              onChange={(e) => setCorreo(e.target.value)}
+              placeholder="coleccionista@correo.com"
+              className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-cyan-500 transition-colors placeholder:text-slate-700"
+            />
           </div>
+
+          <div>
+            <label className="text-xs text-cyan-600 font-bold uppercase tracking-wider mb-2 block">Contraseña</label>
+            <input
+              type="password"
+              required
+              value={contrasena}
+              onChange={(e) => setContrasena(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-cyan-500 transition-colors placeholder:text-slate-700"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={cargando}
+            className="mt-4 w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(8,145,178,0.3)] hover:shadow-[0_0_30px_rgba(8,145,178,0.5)] disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {cargando ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Accediendo...
+              </>
+            ) : (
+              "Entrar a mi Bóveda"
+            )}
+          </button>
         </form>
+
+        <div className="mt-8 pt-6 border-t border-slate-800 text-center">
+          <p className="text-sm text-slate-400">
+            ¿Aún no tienes una bóveda?{" "}
+            <Link href="/registro" className="text-cyan-400 font-bold hover:text-cyan-300 transition-colors ml-1">
+              Crear cuenta gratis
+            </Link>
+          </p>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

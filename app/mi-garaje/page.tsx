@@ -5,13 +5,13 @@ import { supabase } from "@/lib/supabase";
 import CollectorCard from "@/components/CollectorCard";
 import { evaluarLogros } from "@/lib/logrosEngine";
 import AchievementUnlock from "@/components/AchievementUnlock";
+import Link from "next/link";
 
 export default function MiGaraje() {
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [miPerfil, setMiPerfil] = useState<any>(null);
   const [misCarros, setMisCarros] = useState<any[]>([]);
   
-  // CATÁLOGOS BASE
   const [fabricantes, setFabricantes] = useState<any[]>([]);
   const [marcas, setMarcas] = useState<any[]>([]);
   const [series, setSeries] = useState<any[]>([]);
@@ -19,20 +19,20 @@ export default function MiGaraje() {
   const [escalas, setEscalas] = useState<any[]>([]);
   const [estadosCarro, setEstadosCarro] = useState<any[]>([]);
 
-  // ESTADOS DE UI Y BÚSQUEDA
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [cocheEditando, setCocheEditando] = useState<number | null>(null);
-  const [busqueda, setBusqueda] = useState(""); // <-- NUEVO ESTADO DEL BUSCADOR
+  const [busqueda, setBusqueda] = useState(""); 
   
   const [fotoArchivo, setFotoArchivo] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [nuevosLogros, setNuevosLogros] = useState<string[]>([]);
 
+  // 1. NUEVO ESTADO: Agregamos "para_cambio"
   const [nuevoCarro, setNuevoCarro] = useState({
     modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "",
     id_serie: "", otra_serie: "", rareza: "", valor: "", id_escala: "", id_estado_carro: "", 
-    no_carro: "", total_carros: "", anio_serie: ""
+    no_carro: "", total_carros: "", anio_serie: "", para_cambio: false
   });
 
   const anioActual = new Date().getFullYear();
@@ -127,6 +127,7 @@ export default function MiGaraje() {
       modelo: nuevoCarro.modelo, id_fabricante: finalIdFab, marca: finalIdMar, serie: finalIdSer,  
       rareza: nuevoCarro.rareza, valor: parseFloat(nuevoCarro.valor) || 0,
       escala: parseInt(nuevoCarro.id_escala) || null, estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, no_carro: parseInt(nuevoCarro.no_carro) || null,
+      para_cambio: nuevoCarro.para_cambio // 2. ENVIAMOS EL DATO A LA BD
     };
 
     if (imagenUrlFinal) payload.imagen_url = imagenUrlFinal;
@@ -158,7 +159,8 @@ export default function MiGaraje() {
       modelo: carro.modelo || "", id_fabricante: carro.id_fabricante ? carro.id_fabricante.toString() : "", otro_fabricante: "",
       id_marca: idMarcaReal.toString(), otra_marca: "", id_serie: idSerieReal.toString(), otra_serie: "", rareza: carro.rareza || "",
       valor: carro.valor ? carro.valor.toString() : "", id_escala: carro.escala ? carro.escala.toString() : "", id_estado_carro: carro.estado_carro ? carro.estado_carro.toString() : "",
-      no_carro: carro.no_carro ? carro.no_carro.toString() : "", total_carros: carro.serie?.no_carros ? carro.serie.no_carros.toString() : "", anio_serie: carro.serie?.anio ? carro.serie.anio.toString() : ""
+      no_carro: carro.no_carro ? carro.no_carro.toString() : "", total_carros: carro.serie?.no_carros ? carro.serie.no_carros.toString() : "", anio_serie: carro.serie?.anio ? carro.serie.anio.toString() : "",
+      para_cambio: carro.para_cambio || false // 3. CARGAMOS EL DATO AL EDITAR
     });
     setFotoPreview(carro.imagen_url || null); setFotoArchivo(null); setIsModalOpen(true);
   };
@@ -172,12 +174,9 @@ export default function MiGaraje() {
 
   const cerrarModal = () => {
     setIsModalOpen(false); setCocheEditando(null); setFotoArchivo(null); setFotoPreview(null);
-    setNuevoCarro({ modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "", id_serie: "", otra_serie: "", rareza: "", valor: "", id_escala: "", id_estado_carro: "", no_carro: "", total_carros: "", anio_serie: "" });
+    setNuevoCarro({ modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "", id_serie: "", otra_serie: "", rareza: "", valor: "", id_escala: "", id_estado_carro: "", no_carro: "", total_carros: "", anio_serie: "", para_cambio: false });
   };
 
-  // ==========================================
-  // LÓGICA DEL BUSCADOR (Filtrado en vivo)
-  // ==========================================
   const idFabAct = parseInt(nuevoCarro.id_fabricante) || null;
   const seriesFiltradas = idFabAct ? series.filter(s => s.id_fabricante === idFabAct) : series;
   const rarezasFiltradas = idFabAct ? rarezas.filter(r => r.id_fabricante === idFabAct) : rarezas;
@@ -185,10 +184,7 @@ export default function MiGaraje() {
   const carrosFiltrados = misCarros.filter(carro => {
     if (!busqueda) return true;
     const termino = busqueda.toLowerCase();
-    const matchModelo = carro.modelo?.toLowerCase().includes(termino);
-    const matchMarca = carro.marca?.marca?.toLowerCase().includes(termino);
-    const matchSerie = carro.serie?.serie?.toLowerCase().includes(termino);
-    return matchModelo || matchMarca || matchSerie;
+    return carro.modelo?.toLowerCase().includes(termino) || carro.marca?.marca?.toLowerCase().includes(termino) || carro.serie?.serie?.toLowerCase().includes(termino);
   });
 
   if (cargandoDatos) return <div className="flex min-h-screen items-center justify-center text-cyan-500 animate-pulse font-bold tracking-widest">ABRIENDO GARAJE...</div>;
@@ -203,20 +199,13 @@ export default function MiGaraje() {
         </button>
       </header>
 
-      {/* BARRA DE BÚSQUEDA DE CACERÍA */}
       {misCarros.length > 0 && (
         <section className="max-w-7xl mx-auto mb-8">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <svg className="h-5 w-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             </div>
-            <input 
-              type="text" 
-              placeholder="Buscar por modelo, marca o serie (Modo Cacería)..." 
-              value={busqueda} 
-              onChange={(e) => setBusqueda(e.target.value)} 
-              className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl pl-11 pr-4 py-3.5 focus:border-cyan-500 outline-none transition-all placeholder:text-slate-500"
-            />
+            <input type="text" placeholder="Buscar por modelo, marca o serie (Modo Cacería)..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl pl-11 pr-4 py-3.5 focus:border-cyan-500 outline-none transition-all placeholder:text-slate-500" />
           </div>
         </section>
       )}
@@ -235,9 +224,18 @@ export default function MiGaraje() {
               <div key={carro.id_carro} className="relative group">
                 {carro.estado_aprobacion === 'PENDIENTE' && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-black text-[10px] font-bold px-2 py-1 rounded shadow-lg">EN REVISIÓN</div>}
                 
-                <div className="absolute top-2 left-2 z-20 flex flex-col gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => abrirParaEditar(carro)} title="Editar Pieza" className="bg-cyan-900/90 hover:bg-cyan-600 text-cyan-100 border border-cyan-700 p-2 rounded-lg shadow-lg backdrop-blur-sm transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
-                  <button onClick={() => eliminarCarro(carro.id_carro)} title="Eliminar Pieza" className="bg-red-900/90 hover:bg-red-600 text-red-100 border border-red-700 p-2 rounded-lg shadow-lg backdrop-blur-sm transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                {/* 4. MUESTRA UN ÍCONO VISUAL SI ES PARA CAMBIO */}
+                {carro.para_cambio && (
+                  <div className="absolute top-2 left-2 z-20 bg-emerald-500/90 backdrop-blur-sm border border-emerald-400 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    PARA CAMBIO
+                  </div>
+                )}
+
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-10 flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl">
+                  <button onClick={() => abrirParaEditar(carro)} className="bg-cyan-600 text-white px-4 py-2 rounded-lg shadow-lg font-bold text-sm w-32 flex justify-center items-center gap-2 hover:bg-cyan-500"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg> Editar</button>
+                  <button onClick={() => eliminarCarro(carro.id_carro)} className="bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg font-bold text-sm w-32 flex justify-center items-center gap-2 hover:bg-red-500"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg> Eliminar</button>
+                  <Link href={`/pieza/${carro.id_carro}`} className="bg-slate-700 text-white px-4 py-2 rounded-lg shadow-lg font-bold text-sm w-32 flex justify-center items-center gap-2 hover:bg-slate-600 mt-2">Ver Detalles</Link>
                 </div>
 
                 <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} valor={carro.valor} imagenUrl={carro.imagen_url} />
@@ -361,6 +359,20 @@ export default function MiGaraje() {
                   <div>
                     <label className="text-xs text-cyan-500 font-bold uppercase tracking-wider mb-2 block">Valor Estimado ($)</label>
                     <input type="number" step="0.01" placeholder="0.00" value={nuevoCarro.valor} onChange={(e) => setNuevoCarro({...nuevoCarro, valor: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-emerald-300 rounded-xl px-4 py-3.5 outline-none font-mono" />
+                  </div>
+                </div>
+
+                {/* 5. EL INTERRUPTOR DE NEGOCIACIÓN */}
+                <div className="bg-emerald-900/10 border border-emerald-900/30 p-4 rounded-xl flex items-center justify-between cursor-pointer" onClick={() => setNuevoCarro({...nuevoCarro, para_cambio: !nuevoCarro.para_cambio})}>
+                  <div>
+                    <p className="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                      Disponible para Intercambio
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">Si activas esto, otros usuarios podrán enviarte mensaje.</p>
+                  </div>
+                  <div className={`w-12 h-6 rounded-full flex items-center transition-colors px-1 ${nuevoCarro.para_cambio ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                    <div className={`w-4 h-4 rounded-full bg-white transform transition-transform ${nuevoCarro.para_cambio ? 'translate-x-6' : 'translate-x-0'}`}></div>
                   </div>
                 </div>
 

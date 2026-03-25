@@ -164,18 +164,28 @@ export default function EditarPerfil() {
             </div>
           </div>
 
-          {/* REDES DE CONTACTO */}
+          {/* REDES DE CONTACTO CON AVISO DE PRIVACIDAD */}
           <div className="space-y-4">
-            <h3 className="text-xs text-cyan-500 font-bold uppercase tracking-wider border-b border-slate-800 pb-2">Contacto & Redes</h3>
+            <div className="flex justify-between items-end border-b border-slate-800 pb-2">
+              <h3 className="text-xs text-cyan-500 font-bold uppercase tracking-wider">Contacto & Redes</h3>
+              <span className="text-[10px] text-emerald-400 font-bold px-2 py-0.5 bg-emerald-900/20 border border-emerald-800 rounded flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                100% Privado
+              </span>
+            </div>
+            
+            <p className="text-xs text-slate-400 mb-2 leading-relaxed">
+              Tus redes sociales y número telefónico están protegidos. <strong className="text-slate-200">Solo serán visibles para usuarios que tú sigas y que te sigan de vuelta (Amigos Mutuos).</strong> Úsalos para coordinar intercambios de forma segura.
+            </p>
             
             <div className="flex items-center gap-3 bg-slate-900 border border-slate-700 rounded-lg px-4 py-1 focus-within:border-cyan-500 transition-colors">
               <span className="text-emerald-500 font-bold text-xl">W</span>
-              <input type="number" placeholder="WhatsApp (Ej. 5512345678)" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="w-full bg-transparent text-white py-2 outline-none" />
+              <input type="number" placeholder="WhatsApp (Ej. 5512345678)" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="w-full bg-transparent text-white py-2 outline-none placeholder:text-slate-600" />
             </div>
 
             <div className="flex items-center gap-3 bg-slate-900 border border-slate-700 rounded-lg px-4 py-1 focus-within:border-cyan-500 transition-colors">
               <span className="text-blue-500 font-bold text-xl">f</span>
-              <input type="text" placeholder="Enlace de tu perfil de Facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} className="w-full bg-transparent text-white py-2 outline-none" />
+              <input type="text" placeholder="Enlace de tu perfil de Facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} className="w-full bg-transparent text-white py-2 outline-none placeholder:text-slate-600" />
             </div>
           </div>
 

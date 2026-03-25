@@ -77,13 +77,9 @@ export default function Navbar() {
             {/* Opciones de Coleccionista (Solo si hay sesión) */}
             {sesion && (
               <>
-                <Link href="/mi-garaje" className="flex items-center gap-1 text-sm font-bold text-emerald-400 hover:text-emerald-300 transition-colors bg-emerald-900/20 px-3 py-1.5 rounded-md border border-emerald-800">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
-                  Mi Garaje
-                </Link>
-                <Link href="/perfil" className="flex items-center gap-1 text-sm font-medium text-slate-300 hover:text-cyan-400 transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                  Mi Perfil
+                <Link href="/mi-panel" className="flex items-center gap-1 text-sm font-bold text-cyan-600 hover:text-cyan-500 transition-colors bg-cyan-50 px-3 py-1.5 rounded-md border border-cyan-200">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                  Mi Panel
                 </Link>
               </>
             )}
@@ -101,7 +97,10 @@ export default function Navbar() {
             {sesion ? (
               <button onClick={handleLogout} className="text-xs font-bold text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-900 px-3 py-1.5 rounded transition-all">Cerrar Sesión</button>
             ) : (
-              <Link href="/login" className="text-xs font-bold text-cyan-400 border border-cyan-700 hover:bg-cyan-700 hover:text-white px-4 py-1.5 rounded transition-all">Ingresar</Link>
+              <div className="flex gap-2">
+                <Link href="/login" className="text-xs font-bold text-slate-300 hover:text-white px-3 py-1.5 transition-all">Ingresar</Link>
+                <Link href="/registro" className="text-xs font-bold text-black bg-cyan-500 hover:bg-cyan-400 px-4 py-1.5 rounded-full transition-all shadow-[0_0_10px_rgba(8,145,178,0.5)]">Crear Cuenta</Link>
+              </div>
             )}
           </div>
 
