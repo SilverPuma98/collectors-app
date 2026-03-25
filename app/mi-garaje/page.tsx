@@ -19,23 +19,22 @@ export default function MiGaraje() {
   const [escalas, setEscalas] = useState<any[]>([]);
   const [estadosCarro, setEstadosCarro] = useState<any[]>([]);
 
-  // ESTADOS DEL MODAL Y EDICIÓN
+  // ESTADOS DE UI Y BÚSQUEDA
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [cocheEditando, setCocheEditando] = useState<number | null>(null);
+  const [busqueda, setBusqueda] = useState(""); // <-- NUEVO ESTADO DEL BUSCADOR
   
   const [fotoArchivo, setFotoArchivo] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [nuevosLogros, setNuevosLogros] = useState<string[]>([]);
 
-  // ESTADO DEL FORMULARIO (Ahora incluye el Año)
   const [nuevoCarro, setNuevoCarro] = useState({
     modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "",
     id_serie: "", otra_serie: "", rareza: "", valor: "", id_escala: "", id_estado_carro: "", 
     no_carro: "", total_carros: "", anio_serie: ""
   });
 
-  // Generador de Años (Desde el actual hasta 1890)
   const anioActual = new Date().getFullYear();
   const aniosDisponibles = Array.from({ length: anioActual - 1890 + 1 }, (_, i) => anioActual - i);
 
@@ -82,22 +81,15 @@ export default function MiGaraje() {
     if (file) { setFotoArchivo(file); setFotoPreview(URL.createObjectURL(file)); }
   };
 
-  // MAGIC CREATE: Si el usuario escribe algo nuevo, lo guarda en el catálogo para todos
   const crearSiEsNuevo = async (tabla: string, columna: string, idSeleccionado: string, valorNuevo: string, extraData: any = {}) => {
     if (idSeleccionado !== "nuevo") return parseInt(idSeleccionado) || null;
     if (!valorNuevo) return null;
-    
     const existente = await supabase.from(tabla).select(`id_${tabla}`).ilike(columna, valorNuevo).single();
     if (existente.data) return (existente.data as Record<string, any>)[`id_${tabla}`];
-    
     const { data } = await supabase.from(tabla).insert([{ [columna]: valorNuevo, ...extraData }]).select().single();
     return data ? (data as Record<string, any>)[`id_${tabla}`] : null;
   };
 
-  // ==========================================
-  // AUTO-COMPLETAR DATOS DE LA SERIE
-  // ==========================================
-  // Si el usuario selecciona una serie existente, llenamos automáticamente el Total de Carros y el Año
   useEffect(() => {
     if (nuevoCarro.id_serie && nuevoCarro.id_serie !== "nuevo") {
       const serieSeleccionada = series.find(s => s.id_serie === parseInt(nuevoCarro.id_serie));
@@ -105,20 +97,16 @@ export default function MiGaraje() {
         setNuevoCarro(prev => ({
           ...prev,
           total_carros: serieSeleccionada.no_carros ? serieSeleccionada.no_carros.toString() : "",
-          anio_serie: serieSeleccionada.anio ? serieSeleccionada.anio.toString() : prev.anio_serie // Solo sobreescribe si hay año registrado
+          anio_serie: serieSeleccionada.anio ? serieSeleccionada.anio.toString() : prev.anio_serie 
         }));
       }
     } else if (nuevoCarro.id_serie === "nuevo") {
-      setNuevoCarro(prev => ({ ...prev, total_carros: "", anio_serie: "" })); // Limpiamos si va a crear una nueva
+      setNuevoCarro(prev => ({ ...prev, total_carros: "", anio_serie: "" })); 
     }
   }, [nuevoCarro.id_serie, series]);
 
-  // ==========================================
-  // LÓGICA DE GUARDAR / ACTUALIZAR
-  // ==========================================
   const guardarNuevoCarro = async (e: React.FormEvent) => {
     e.preventDefault(); setGuardando(true);
-
     let imagenUrlFinal = fotoPreview?.includes('blob:') ? null : fotoPreview;
     
     if (fotoArchivo) {
@@ -131,22 +119,14 @@ export default function MiGaraje() {
 
     const finalIdFab = await crearSiEsNuevo('fabricante', 'fabricante', nuevoCarro.id_fabricante, nuevoCarro.otro_fabricante);
     const finalIdMar = await crearSiEsNuevo('marca', 'marca', nuevoCarro.id_marca, nuevoCarro.otra_marca);
-    
-    // Al crear una serie nueva, le pasamos también el año y el total de carros para que alimente el catálogo
     const finalIdSer = await crearSiEsNuevo('serie', 'serie', nuevoCarro.id_serie, nuevoCarro.otra_serie, { 
-      id_fabricante: finalIdFab,
-      anio: parseInt(nuevoCarro.anio_serie) || null,
-      no_carros: parseInt(nuevoCarro.total_carros) || null
+      id_fabricante: finalIdFab, anio: parseInt(nuevoCarro.anio_serie) || null, no_carros: parseInt(nuevoCarro.total_carros) || null
     });
 
     const payload: any = {
-      modelo: nuevoCarro.modelo,
-      id_fabricante: finalIdFab, marca: finalIdMar, serie: finalIdSer,  
-      rareza: nuevoCarro.rareza, 
-      valor: parseFloat(nuevoCarro.valor) || 0,
-      escala: parseInt(nuevoCarro.id_escala) || null,
-      estado_carro: parseInt(nuevoCarro.id_estado_carro) || null,
-      no_carro: parseInt(nuevoCarro.no_carro) || null,
+      modelo: nuevoCarro.modelo, id_fabricante: finalIdFab, marca: finalIdMar, serie: finalIdSer,  
+      rareza: nuevoCarro.rareza, valor: parseFloat(nuevoCarro.valor) || 0,
+      escala: parseInt(nuevoCarro.id_escala) || null, estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, no_carro: parseInt(nuevoCarro.no_carro) || null,
     };
 
     if (imagenUrlFinal) payload.imagen_url = imagenUrlFinal;
@@ -159,7 +139,6 @@ export default function MiGaraje() {
       payload.id_usuario = miPerfil.id_usuario;
       payload.estado_aprobacion = (miPerfil.rol === 'SUPER_ADMIN' || miPerfil.rol === 'COLABORADOR') ? 'APROBADO' : 'PENDIENTE';
       const { error } = await supabase.from('carro').insert([payload]);
-      
       if (error) alert("Error al registrar: " + error.message);
       else {
         cargarMisCarros(miPerfil.id_usuario); cerrarModal();
@@ -170,33 +149,18 @@ export default function MiGaraje() {
     setGuardando(false);
   };
 
-  // ==========================================
-  // LÓGICA DE EDITAR (Precarga TOTAL)
-  // ==========================================
   const abrirParaEditar = (carro: any) => {
     setCocheEditando(carro.id_carro);
-    
-    // Mapeamos los textos a IDs para que los Selects se llenen correctamente
     const idMarcaReal = marcas.find(m => m.marca === carro.marca?.marca)?.id_marca || "";
     const idSerieReal = carro.serie?.id_serie || "";
 
     setNuevoCarro({
-      modelo: carro.modelo || "",
-      id_fabricante: carro.id_fabricante ? carro.id_fabricante.toString() : "", otro_fabricante: "",
-      id_marca: idMarcaReal.toString(), otra_marca: "",
-      id_serie: idSerieReal.toString(), otra_serie: "",
-      rareza: carro.rareza || "",
-      valor: carro.valor ? carro.valor.toString() : "",
-      id_escala: carro.escala ? carro.escala.toString() : "",
-      id_estado_carro: carro.estado_carro ? carro.estado_carro.toString() : "",
-      no_carro: carro.no_carro ? carro.no_carro.toString() : "",
-      // Si la serie tiene año y total de carros guardados, los usamos, si no, lo dejamos vacío
-      total_carros: carro.serie?.no_carros ? carro.serie.no_carros.toString() : "",
-      anio_serie: carro.serie?.anio ? carro.serie.anio.toString() : ""
+      modelo: carro.modelo || "", id_fabricante: carro.id_fabricante ? carro.id_fabricante.toString() : "", otro_fabricante: "",
+      id_marca: idMarcaReal.toString(), otra_marca: "", id_serie: idSerieReal.toString(), otra_serie: "", rareza: carro.rareza || "",
+      valor: carro.valor ? carro.valor.toString() : "", id_escala: carro.escala ? carro.escala.toString() : "", id_estado_carro: carro.estado_carro ? carro.estado_carro.toString() : "",
+      no_carro: carro.no_carro ? carro.no_carro.toString() : "", total_carros: carro.serie?.no_carros ? carro.serie.no_carros.toString() : "", anio_serie: carro.serie?.anio ? carro.serie.anio.toString() : ""
     });
-    setFotoPreview(carro.imagen_url || null);
-    setFotoArchivo(null);
-    setIsModalOpen(true);
+    setFotoPreview(carro.imagen_url || null); setFotoArchivo(null); setIsModalOpen(true);
   };
 
   const eliminarCarro = async (idCarro: number) => {
@@ -211,28 +175,63 @@ export default function MiGaraje() {
     setNuevoCarro({ modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "", id_serie: "", otra_serie: "", rareza: "", valor: "", id_escala: "", id_estado_carro: "", no_carro: "", total_carros: "", anio_serie: "" });
   };
 
+  // ==========================================
+  // LÓGICA DEL BUSCADOR (Filtrado en vivo)
+  // ==========================================
   const idFabAct = parseInt(nuevoCarro.id_fabricante) || null;
   const seriesFiltradas = idFabAct ? series.filter(s => s.id_fabricante === idFabAct) : series;
   const rarezasFiltradas = idFabAct ? rarezas.filter(r => r.id_fabricante === idFabAct) : rarezas;
+
+  const carrosFiltrados = misCarros.filter(carro => {
+    if (!busqueda) return true;
+    const termino = busqueda.toLowerCase();
+    const matchModelo = carro.modelo?.toLowerCase().includes(termino);
+    const matchMarca = carro.marca?.marca?.toLowerCase().includes(termino);
+    const matchSerie = carro.serie?.serie?.toLowerCase().includes(termino);
+    return matchModelo || matchMarca || matchSerie;
+  });
 
   if (cargandoDatos) return <div className="flex min-h-screen items-center justify-center text-cyan-500 animate-pulse font-bold tracking-widest">ABRIENDO GARAJE...</div>;
 
   return (
     <main className="min-h-screen bg-[#050810] p-4 md:p-10 font-sans selection:bg-cyan-900 selection:text-cyan-50 relative overflow-x-hidden">
       
-      <header className="max-w-7xl mx-auto mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-slate-800 pb-8">
+      <header className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-slate-800 pb-8">
         <div><h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight">Mi Garaje<span className="text-cyan-500">.</span></h1><p className="text-slate-400 mt-2 text-lg">Colección de <span className="text-cyan-400 font-semibold">{miPerfil?.nombre_usuario || miPerfil?.correo}</span></p></div>
         <button onClick={() => setIsModalOpen(true)} className="w-full md:w-auto text-sm font-bold bg-cyan-600 hover:bg-cyan-500 text-white px-8 py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(8,145,178,0.4)] flex justify-center items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg> Registrar Auto
         </button>
       </header>
 
+      {/* BARRA DE BÚSQUEDA DE CACERÍA */}
+      {misCarros.length > 0 && (
+        <section className="max-w-7xl mx-auto mb-8">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+            <input 
+              type="text" 
+              placeholder="Buscar por modelo, marca o serie (Modo Cacería)..." 
+              value={busqueda} 
+              onChange={(e) => setBusqueda(e.target.value)} 
+              className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl pl-11 pr-4 py-3.5 focus:border-cyan-500 outline-none transition-all placeholder:text-slate-500"
+            />
+          </div>
+        </section>
+      )}
+
       <section className="max-w-7xl mx-auto">
         {misCarros.length === 0 ? (
           <div className="text-center py-20 bg-slate-900/30 rounded-2xl border border-slate-800 border-dashed px-4"><p className="text-slate-500">Aún no hay joyas en tu garaje.</p></div>
+        ) : carrosFiltrados.length === 0 ? (
+          <div className="text-center py-16 bg-slate-900/30 rounded-2xl border border-slate-800 px-4">
+            <p className="text-slate-400 text-lg">No encontraste <span className="text-cyan-400 font-bold">"{busqueda}"</span>.</p>
+            <p className="text-slate-500 mt-2 text-sm">¡Parece que te falta en la colección! Buen momento para comprarlo.</p>
+          </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-            {misCarros.map((carro) => (
+            {carrosFiltrados.map((carro) => (
               <div key={carro.id_carro} className="relative group">
                 {carro.estado_aprobacion === 'PENDIENTE' && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-black text-[10px] font-bold px-2 py-1 rounded shadow-lg">EN REVISIÓN</div>}
                 
@@ -300,7 +299,6 @@ export default function MiGaraje() {
                   </div>
                 </div>
 
-                {/* FILA DE SERIE, NÚMERO Y AÑO (Completamente conectada) */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 bg-slate-950/50 p-4 rounded-2xl border border-slate-800">
                   <div className="sm:col-span-5">
                     <label className="text-xs text-cyan-500 font-bold uppercase tracking-wider mb-2 block">Serie (Filtrada)</label>
