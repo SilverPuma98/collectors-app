@@ -44,7 +44,15 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
     .eq('estado_aprobacion', 'APROBADO')
     .order('id_carro', { ascending: false });
 
-  // 3. Revisamos si el visitante tiene sesión y si ya sigue a este usuario
+  // 3. Buscamos sus trofeos desbloqueados (¡NUEVO!)
+  const { data: logrosData } = await supabase
+    .from('usuario_logro')
+    .select('logro(*)')
+    .eq('id_usuario', perfil.id_usuario);
+  
+  const trofeos = logrosData?.map(l => l.logro) || [];
+
+  // 4. Revisamos si el visitante tiene sesión y si ya sigue a este usuario
   const { data: { session } } = await supabase.auth.getSession();
   let miIdUsuario = null;
   let yaLoSigo = false;
@@ -72,7 +80,6 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
   const esVendedor = perfil.rol === 'VENDEDOR' || perfil.rol === 'SUPER_ADMIN';
 
   // Lógica de visualización de contacto
-  // Los vendedores muestran contacto siempre (si lo tienen configurado). Los usuarios normales solo a mutuos.
   const mostrarContacto = esVendedor || sonMutuos || esMio;
 
   const enlaceWhatsApp = perfil.whatsapp ? `https://wa.me/${perfil.whatsapp}` : null;
@@ -83,6 +90,17 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
   const nombreMunicipio = perfil.municipio?.municipio || "";
   const nombreEstado = perfil.municipio?.estado?.estado || "";
   const ubicacion = nombreMunicipio && nombreEstado ? `${nombreMunicipio}, ${nombreEstado}` : (nombreEstado || "Ubicación no registrada");
+
+  // Colores mini para las medallas
+  const getMiniRarezaColor = (rareza: string) => {
+    switch (rareza) {
+      case "Legendario": return "border-purple-400 bg-purple-50 text-purple-600";
+      case "Oro": return "border-amber-400 bg-amber-50 text-amber-600";
+      case "Plata": return "border-slate-300 bg-slate-50 text-slate-600";
+      case "Bronce": return "border-orange-300 bg-orange-50 text-orange-600";
+      default: return "border-slate-200 bg-slate-50 text-slate-500";
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 selection:bg-cyan-200 selection:text-cyan-900 pb-20 font-sans">
@@ -112,9 +130,26 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               {esVendedor && <svg className="w-6 h-6 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>}
             </h1>
             
-            <p className="text-sm font-bold text-slate-500 mb-4 flex items-center justify-center md:justify-start gap-1">
+            <p className="text-sm font-bold text-slate-500 mb-3 flex items-center justify-center md:justify-start gap-1">
               📍 {ubicacion}
             </p>
+
+            {/* MINI LOGROS (Estilo Álbum de Estampas) */}
+            {trofeos.length > 0 && (
+              <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-4">
+                {trofeos.map((t: any) => (
+                  <div key={t.id_logro} className={`w-8 h-8 rounded-full border flex items-center justify-center p-1.5 relative group cursor-help transition-transform hover:scale-110 shadow-sm ${getMiniRarezaColor(t.rareza_logro)}`}>
+                    <img src={t.link_img_medalla || "/placeholder-medal.png"} alt={t.nombre} className="w-full h-full object-contain" />
+                    
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20 whitespace-nowrap bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg">
+                      {t.nombre}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-6">
               <div className="bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-center shadow-sm">
@@ -153,7 +188,7 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               )}
             </div>
 
-            {/* Panel de Contacto (Visible para Vendedores o Mutuos) */}
+            {/* Panel de Contacto */}
             {mostrarContacto && (enlaceWhatsApp || enlaceFacebook) && (
               <div className="mt-6 flex flex-wrap justify-center md:justify-start gap-3">
                 {enlaceWhatsApp && <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer" className="text-xs font-bold bg-[#25D366]/10 text-[#1DA851] border border-[#25D366]/30 px-4 py-2 rounded-lg hover:bg-[#25D366]/20 transition-colors flex items-center gap-1">📱 WhatsApp</a>}

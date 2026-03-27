@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
+import BotonReportar from '@/components/BotonReportar';
 
 export const revalidate = 60; 
 
@@ -131,6 +132,13 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               </p>
             </div>
           </Link>
+
+          {/* BOTÓN DE REPORTAR (NUEVO CÓDIGO) */}
+          <div className="flex justify-end mb-2">
+            {miIdUsuario && !esMiPieza && (
+              <BotonReportar idCarro={carro.id_carro} miIdUsuario={miIdUsuario} />
+            )}
+          </div>
 
           <h1 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight mb-2 tracking-tight">
             {carro.modelo}

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import CollectorCard from "@/components/CollectorCard";
 import { evaluarLogros } from "@/lib/logrosEngine";
 import AchievementUnlock from "@/components/AchievementUnlock";
+import TrophyShowcase from "@/components/TrophyShowcase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import imageCompression from 'browser-image-compression';
@@ -14,7 +15,6 @@ export default function MiPanelUsuario() {
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [miPerfil, setMiPerfil] = useState<any>(null);
   
-  // TABS
   const [tabActiva, setTabActiva] = useState("boveda"); 
 
   // ==========================================
@@ -35,6 +35,7 @@ export default function MiPanelUsuario() {
   const [fotoArchivoCarro, setFotoArchivoCarro] = useState<File | null>(null);
   const [fotoPreviewCarro, setFotoPreviewCarro] = useState<string | null>(null);
   const [nuevosLogros, setNuevosLogros] = useState<string[]>([]);
+  const [misTrofeos, setMisTrofeos] = useState<any[]>([]);
 
   const [nuevoCarro, setNuevoCarro] = useState({
     modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "",
@@ -92,8 +93,22 @@ export default function MiPanelUsuario() {
         }
       }
 
+      // Cargar Autos
       const { data: carrosData } = await supabase.from('carro').select(`*, marca(marca), serie(*), fabricante(fabricante)`).eq('id_usuario', perfilData.id_usuario).order('id_carro', { ascending: false });
       if (carrosData) setMisCarros(carrosData);
+
+      // Cargar Logros Completos y Ver cuáles tiene el usuario
+      const { data: todosLosLogros } = await supabase.from('logro').select('*').order('id_logro', { ascending: true });
+      const { data: misLogrosData } = await supabase.from('usuario_logro').select('id_logro').eq('id_usuario', perfilData.id_usuario);
+      
+      if (todosLosLogros) {
+        const misIds = misLogrosData?.map(ml => ml.id_logro) || [];
+        const logrosMapeados = todosLosLogros.map(logro => ({
+          ...logro,
+          unlocked: misIds.includes(logro.id_logro)
+        }));
+        setMisTrofeos(logrosMapeados);
+      }
     }
 
     const [resFab, resMar, resSer, resRar, resEsc, resEstCarro, resEstMex] = await Promise.all([
@@ -199,16 +214,13 @@ export default function MiPanelUsuario() {
       if (error) alert("Error al editar: " + error.message); else { cargarDatosCentrales(); cerrarModal(); alert("¡Pieza actualizada!"); }
     } else {
       payload.id_usuario = miPerfil.id_usuario;
-      payload.estado_aprobacion = 'APROBADO'; // Si llegó aquí, es Admin/Vendedor/Normal. (Ajusta tus reglas según tu plataforma)
+      payload.estado_aprobacion = 'APROBADO'; 
       const { error } = await supabase.from('carro').insert([payload]);
-      if (error) alert("Error al registrar: " + error.message); else { cargarDatosCentrales(); cerrarModal(); }
+      if (error) alert("Error al registrar: " + error.message); else { cargarDatosCentrales(); cerrarModal(); const medallasGanadas = await evaluarLogros(miPerfil.id_usuario); if (medallasGanadas && medallasGanadas.length > 0) setNuevosLogros(medallasGanadas); }
     }
     setGuardandoCarro(false);
   };
 
-  // ==========================================
-  // FUNCIONES MODO RÁFAGA
-  // ==========================================
   const manejarSeleccionMasiva = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -251,7 +263,7 @@ export default function MiPanelUsuario() {
         
         const payload = {
           id_usuario: miPerfil.id_usuario, modelo: item.modelo, marca: parseInt(item.id_marca) || null, valor: parseFloat(item.valor) || 0,
-          imagen_url: urlData.publicUrl, estado_aprobacion: 'APROBADO', para_venta: true, para_cambio: false // AL SER VENDEDOR EN RAFAGA, VA DIRECTO A VENTA
+          imagen_url: urlData.publicUrl, estado_aprobacion: 'APROBADO', para_venta: true, para_cambio: false 
         };
 
         const { error } = await supabase.from('carro').insert([payload]);
@@ -265,7 +277,7 @@ export default function MiPanelUsuario() {
     
     setArchivosRafaga([]);
     cargarDatosCentrales();
-    setTabActiva("boveda"); // Regresamos a la vista principal
+    setTabActiva("boveda"); 
   };
 
 
@@ -326,8 +338,15 @@ export default function MiPanelUsuario() {
           <button onClick={() => setTabActiva("boveda")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "boveda" ? "bg-white border-2 border-cyan-500 shadow-md text-cyan-700" : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-700"}`}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg> Mi Bóveda
           </button>
+          
           <button onClick={() => setTabActiva("perfil")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "perfil" ? "bg-white border-2 border-cyan-500 shadow-md text-cyan-700" : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-700"}`}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> Configurar Perfil
+          </button>
+
+          {/* NUEVA PESTAÑA: LOGROS */}
+          <button onClick={() => setTabActiva("logros")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "logros" ? "bg-white border-2 border-cyan-500 shadow-md text-cyan-700" : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-700"}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg> 
+            Álbum de Logros
           </button>
           
           {/* PESTAÑA EXCLUSIVA VENDEDORES */}
@@ -404,10 +423,6 @@ export default function MiPanelUsuario() {
                    <div className="space-y-4">
                      <div className="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-2 focus-within:border-cyan-500 transition-colors shadow-sm"><span className="text-emerald-500 font-bold text-xl">W</span><input type="number" placeholder="WhatsApp (Ej. 5512345678)" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="w-full bg-transparent text-slate-900 py-1.5 outline-none placeholder:text-slate-400 font-medium" /></div>
                      <div className="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-2 focus-within:border-cyan-500 transition-colors shadow-sm"><span className="text-blue-600 font-bold text-xl">f</span><input type="text" placeholder="Enlace de Facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} className="w-full bg-transparent text-slate-900 py-1.5 outline-none placeholder:text-slate-400 font-medium" /></div>
-                     <div className="flex items-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-2 focus-within:border-cyan-500 transition-colors shadow-sm">
-                       <span className="text-red-500 font-bold text-xl">📍</span>
-                       <input type="text" placeholder="Enlace de Google Maps (Tu Tienda)" value={linkMaps} onChange={(e) => setLinkMaps(e.target.value)} className="w-full bg-transparent text-slate-900 py-1.5 outline-none placeholder:text-slate-400 font-medium" />
-                     </div>
                    </div>
                  </div>
 
@@ -419,6 +434,15 @@ export default function MiPanelUsuario() {
                    </div>
                  </div>
 
+                 {/* CAMPO DE GOOGLE MAPS PARA TIENDAS PRO */}
+                 {miPerfil?.rol === 'VENDEDOR' && (
+                  <div className="mt-4 border p-4 rounded-xl transition-colors border-slate-200 bg-slate-50 shadow-sm" >
+                    <p className="text-sm font-bold flex items-center gap-2 text-slate-700 mb-2">📍 Ubicación Tienda (Google Maps)</p>
+                    <input type="text" placeholder="Pega aquí el enlace a Google Maps de tu tienda" value={linkMaps} onChange={(e) => setLinkMaps(e.target.value)} className="w-full bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 outline-none focus:border-cyan-500 font-medium text-sm" />
+                    <p className="text-xs text-slate-500 mt-2">Aparecerá un botón rojo en tu perfil para que los clientes te visiten.</p>
+                  </div>
+                 )}
+
                  <div className="pt-4 border-t border-slate-100">
                    <button type="submit" disabled={guardandoPerfil} className="w-full md:w-auto md:px-12 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg hover:shadow-cyan-500/30 disabled:opacity-50">{guardandoPerfil ? "Guardando..." : "Guardar Perfil"}</button>
                  </div>
@@ -426,8 +450,15 @@ export default function MiPanelUsuario() {
              </div>
           )}
 
+          {/* PANTALLA 3: ÁLBUM DE LOGROS */}
+          {tabActiva === "logros" && (
+            <div className="animate-in fade-in duration-300">
+              <TrophyShowcase trofeos={misTrofeos} />
+            </div>
+          )}
+
           {/* =======================================================
-              PANTALLA 3: MODO RÁFAGA (SOLO TIENDAS/PRO)
+              PANTALLA 4: MODO RÁFAGA (SOLO TIENDAS/PRO)
               ======================================================= */}
           {tabActiva === "rafaga" && (
             <div className="animate-in fade-in duration-300">
@@ -459,12 +490,10 @@ export default function MiPanelUsuario() {
                   <div className="flex flex-col gap-4">
                     {archivosRafaga.map((item, index) => (
                       <div key={index} className="flex flex-col sm:flex-row gap-4 bg-white border border-slate-200 p-3 rounded-2xl shadow-sm items-center">
-                        {/* Preview Foto */}
                         <div className="w-full sm:w-24 h-24 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200 relative">
                           <img src={item.preview} alt="preview" className="w-full h-full object-cover" />
                           <button onClick={() => eliminarDeRafaga(index)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-400"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
                         </div>
-                        {/* Mini Formulario */}
                         <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
                           <input type="text" placeholder="Modelo (Ej. Skyline)" value={item.modelo} onChange={e => actualizarItemRafaga(index, 'modelo', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-400" />
                           <select value={item.id_marca} onChange={e => actualizarItemRafaga(index, 'id_marca', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-400">
