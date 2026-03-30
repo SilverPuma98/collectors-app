@@ -77,9 +77,10 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
     <main className="min-h-screen bg-slate-50 selection:bg-cyan-200 selection:text-cyan-900 pb-20 font-sans">
       
       <div className="max-w-6xl mx-auto px-4 pt-6 md:pt-10">
-        <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-cyan-600 transition-colors font-bold text-sm bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
+        {/* CORRECCIÓN: Ahora te regresa al perfil del dueño en lugar de ir al inicio */}
+        <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="inline-flex items-center gap-2 text-slate-500 hover:text-cyan-600 transition-colors font-bold text-sm bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-          Volver
+          Volver al Perfil
         </Link>
       </div>
 
@@ -133,7 +134,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
             </div>
           </Link>
 
-          {/* BOTÓN DE REPORTAR (NUEVO CÓDIGO) */}
+          {/* BOTÓN DE REPORTAR */}
           <div className="flex justify-end mb-2">
             {miIdUsuario && !esMiPieza && (
               <BotonReportar idCarro={carro.id_carro} miIdUsuario={miIdUsuario} />
@@ -145,7 +146,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
           </h1>
           <p className="text-xl text-cyan-600 font-bold mb-8">{carro.marca?.marca || 'Marca Desconocida'} • {carro.fabricante?.fabricante || 'Sin Fabricante'}</p>
 
-          <div className="grid grid-cols-2 gap-4 mb-10">
+          <div className="grid grid-cols-2 gap-4 mb-8">
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
               <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Serie / Año</p>
               <p className="text-sm text-slate-800 font-bold">{carro.serie?.serie || 'Sin Serie'} {carro.serie?.anio ? `(${carro.serie.anio})` : ''}</p>
@@ -164,6 +165,24 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
+          {/* =======================================================
+              COMPARATIVA DE PRECIOS NEUTRA 
+              ======================================================= */}
+          <div className="grid grid-cols-2 gap-4 mb-10">
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left">
+              <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Precio del Dueño</p>
+              <p className="text-3xl font-black text-slate-900">${carro.valor ? carro.valor.toLocaleString() : '0'}</p>
+            </div>
+            <div className="bg-cyan-50 border border-cyan-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-400/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+              <p className="text-[10px] text-cyan-700 uppercase font-black tracking-widest mb-1 relative z-10 flex items-center gap-1.5">
+                Valuación IA 
+                <span className="text-[8px] bg-cyan-600 text-white px-1.5 py-0.5 rounded shadow-sm">BETA</span>
+              </p>
+              <p className="text-3xl font-black text-cyan-800 relative z-10">${carro.valor_calculado ? carro.valor_calculado.toLocaleString() : '0'}</p>
+            </div>
+          </div>
+
           {/* ÁREA DE NEGOCIACIÓN INTELIGENTE */}
           {esMiPieza ? (
             <div className="bg-cyan-50 border border-cyan-200 rounded-2xl p-5 text-center shadow-sm">
@@ -171,13 +190,9 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               {esVenta ? <p className="text-xs text-slate-600 mt-1 font-medium">Actualmente la tienes en venta en la Tienda.</p> : esCambio ? <p className="text-xs text-slate-600 mt-1 font-medium">Actualmente la tienes marcada para Intercambio.</p> : <p className="text-xs text-slate-600 mt-1 font-medium">Actualmente la tienes marcada como Solo Exhibición.</p>}
             </div>
           ) : esVenta ? (
-            // ==============================================
-            // MODO TIENDA: Venta directa (No requiere mutuos)
-            // ==============================================
             <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 text-center shadow-sm relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-              <p className="text-amber-700 font-black uppercase tracking-wider text-xs mb-2">Comprar esta pieza</p>
-              <p className="text-4xl text-amber-600 font-mono font-black mb-6">${carro.valor}</p>
+              <p className="text-amber-700 font-black uppercase tracking-wider text-xs mb-4">Adquirir esta pieza</p>
               
               {enlaceWhatsApp ? (
                 <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer" className="w-full bg-amber-500 hover:bg-amber-400 text-white font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-amber-500/40 relative z-10">
@@ -189,18 +204,12 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               )}
             </div>
           ) : !esCambio ? (
-            // ==============================================
-            // MODO EXHIBICIÓN
-            // ==============================================
             <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
               <p className="text-2xl mb-2">🔒</p>
               <p className="text-slate-800 font-black mb-1">Pieza de Exhibición</p>
               <p className="text-xs text-slate-500 font-medium">Esta pieza es parte de la colección privada de {carro.usuario?.nombre_usuario} y no está disponible para negociar.</p>
             </div>
           ) : !sonMutuos ? (
-            // ==============================================
-            // MODO CAMBIO (BLOQUEADO)
-            // ==============================================
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
               <p className="text-2xl mb-2">🤝</p>
               <p className="text-slate-700 font-black mb-1">Disponible para Intercambio</p>
@@ -208,16 +217,8 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="mt-4 inline-block bg-cyan-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-cyan-500 transition-colors shadow-md">Ir a su Perfil</Link>
             </div>
           ) : (
-            // ==============================================
-            // MODO CAMBIO (DESBLOQUEADO)
-            // ==============================================
             <div className="flex flex-col gap-3">
-              <p className="text-xs text-emerald-600 font-black uppercase tracking-wider text-center mb-2 bg-emerald-50 py-2 rounded-lg border border-emerald-100">✨ Son Amigos Mutuos. ¡Contacto Desbloqueado!</p>
-              
-              <div className="col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-4 flex justify-between items-center shadow-sm mb-2">
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Valor Base</p>
-                <p className="text-xl text-emerald-600 font-mono font-black">${carro.valor}</p>
-              </div>
+              <p className="text-xs text-emerald-600 font-black uppercase tracking-wider text-center mb-4 bg-emerald-50 py-2 rounded-lg border border-emerald-100">✨ Son Amigos Mutuos. ¡Contacto Desbloqueado!</p>
 
               {enlaceWhatsApp && (
                 <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-[#25D366]/40">

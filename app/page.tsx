@@ -11,7 +11,7 @@ export default function HomeFeed() {
   
   const [autosAmigos, setAutosAmigos] = useState<any[]>([]);
   const [autosExplorar, setAutosExplorar] = useState<any[]>([]);
-  const [tiendasLocales, setTiendasLocales] = useState<any[]>([]); // 📍 NUEVO: Radar de tiendas locales
+  const [tiendasLocales, setTiendasLocales] = useState<any[]>([]); 
 
   const [query, setQuery] = useState("");
   const [buscando, setBuscando] = useState(false);
@@ -38,7 +38,6 @@ export default function HomeFeed() {
           listaSeguidos = follows.map(f => f.seguido_id);
         }
 
-        // 📍 ALGORITMO HIPERLOCAL: Buscar tiendas en su mismo municipio
         if (perfil.id_mun) {
           const { data: tiendas } = await supabase
             .from('usuario')
@@ -91,7 +90,6 @@ export default function HomeFeed() {
 
   const realizarBusqueda = async (texto: string) => {
     setBuscando(true);
-    // El buscador ya encuentra Vendedores por nombre gracias al ilike de abajo
     const resUsu = await supabase.from('usuario').select('id_usuario, nombre_usuario, link_img_perf, rol').ilike('nombre_usuario', `%${texto}%`).limit(10);
     if (resUsu.data) setUsuariosEncontrados(resUsu.data);
 
@@ -172,7 +170,8 @@ export default function HomeFeed() {
                         <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="text-[10px] font-bold text-slate-300 hover:text-white transition-colors truncate">De {carro.usuario?.nombre_usuario || "Anónimo"}</Link>
                       </div>
                       <Link href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200">
-                        <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} valor={carro.valor} imagenUrl={carro.imagen_url} />
+                        {/* 🧠 ACTUALIZADO: Pasamos el valor_calculado */}
+                        <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} valor={carro.valor} valorCalculado={carro.valor_calculado} imagenUrl={carro.imagen_url} />
                       </Link>
                     </article>
                   ))}
@@ -184,7 +183,7 @@ export default function HomeFeed() {
           /* VISTA DEL FEED */
           <div className="flex flex-col gap-10 animate-in fade-in duration-500 mt-4">
             
-            {/* 📍 NUEVA SECCIÓN: TIENDAS LOCALES */}
+            {/* 📍 SECCIÓN: TIENDAS LOCALES */}
             {miIdUsuario && tiendasLocales.length > 0 && (
               <section className="bg-amber-900/10 border border-amber-900/30 rounded-3xl p-6 relative overflow-hidden shadow-lg">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
@@ -231,7 +230,8 @@ export default function HomeFeed() {
                         </div>
                       </div>
                       <Link href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200">
-                        <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} valor={carro.valor} imagenUrl={carro.imagen_url} />
+                        {/* 🧠 ACTUALIZADO: Pasamos el valor_calculado */}
+                        <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} valor={carro.valor} valorCalculado={carro.valor_calculado} imagenUrl={carro.imagen_url} />
                       </Link>
                     </article>
                   ))}
@@ -265,7 +265,8 @@ export default function HomeFeed() {
                     </div>
                     <Link href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200 relative">
                       {carro.para_venta && <div className="absolute top-1 right-1 z-20 bg-amber-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-md">💲 VENTA</div>}
-                      <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} valor={carro.valor} imagenUrl={carro.imagen_url} />
+                      {/* 🧠 ACTUALIZADO: Pasamos el valor_calculado */}
+                      <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} valor={carro.valor} valorCalculado={carro.valor_calculado} imagenUrl={carro.imagen_url} />
                     </Link>
                   </article>
                 ))}

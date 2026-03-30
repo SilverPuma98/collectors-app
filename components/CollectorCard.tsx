@@ -1,42 +1,55 @@
-import Image from "next/image";
+import React from 'react';
 
-interface CardProps {
+interface CollectorCardProps {
   modelo: string;
   marca: string;
   rareza: string;
   valor: number;
-  imagenUrl?: string; // Hacemos la imagen opcional para manejar fallbacks
+  valorCalculado?: number; // 🧠 NUEVO: Recibe el valor de la IA
+  imagenUrl?: string;
 }
 
-export default function CollectorCard({ modelo, marca, rareza, valor, imagenUrl }: CardProps) {
+export default function CollectorCard({ modelo, marca, rareza, valor, valorCalculado, imagenUrl }: CollectorCardProps) {
   return (
-    <div className="w-full flex flex-col bg-[#0b1120] border border-slate-800/50 rounded-2xl overflow-hidden hover:shadow-[0_0_15px_rgba(8,145,178,0.15)] hover:border-cyan-900/50 transition-all duration-300 group cursor-pointer">
+    <div className="bg-[#0b1120] border border-slate-800 rounded-2xl overflow-hidden shadow-lg hover:border-cyan-800 transition-colors w-full flex flex-col h-full">
       
-      {/* Zona de la Foto (Optimizada con next/image) */}
-      <div className="h-48 w-full bg-slate-900/50 flex items-center justify-center relative overflow-hidden">
+      {/* FOTO DE LA PIEZA */}
+      <div className="relative w-full aspect-[4/3] bg-white flex items-center justify-center p-2">
         {imagenUrl ? (
-          <Image 
-            src={imagenUrl} 
-            alt={`Carro a escala ${marca} ${modelo}`} 
-            fill // Ocupa todo el contenedor padre
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            quality={80} // Balance perfecto entre peso y calidad visual
-          />
+          <img src={imagenUrl} alt={modelo} className="w-full h-full object-contain drop-shadow-md" />
         ) : (
-          <span className="text-slate-600 text-sm font-medium tracking-widest uppercase group-hover:text-cyan-600/50 transition-colors z-10">
-            Sin Imagen
-          </span>
+          <svg className="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
         )}
       </div>
+      
+      {/* TEXTOS Y DATOS */}
+      <div className="p-3 md:p-4 flex flex-col flex-1 justify-between gap-3">
+        <div>
+          <p className="text-[9px] md:text-[10px] font-bold text-cyan-500 uppercase tracking-widest mb-1 truncate">{marca}</p>
+          <h3 className="text-xs md:text-sm font-black text-white leading-tight line-clamp-2">{modelo}</h3>
+        </div>
+        
+        {/* PIE DE TARJETA: RAREZA Y PRECIOS */}
+        <div className="flex justify-between items-end mt-auto pt-2 border-t border-slate-800/50 gap-2">
+          
+          <span className="text-[9px] md:text-[10px] font-medium bg-slate-800 text-slate-300 px-2 py-1 rounded-md max-w-[45%] truncate">
+            {rareza}
+          </span>
+          
+          <div className="flex flex-col items-end gap-1.5">
+            {/* Valor del Dueño (Blanco) */}
+            <span className="text-white font-bold text-xs md:text-sm leading-none">
+              ${valor ? valor.toLocaleString() : '0'}
+            </span>
+            
+            {/* Valor IA (Dorado) - Solo si existe y es mayor a 0 */}
+            {(valorCalculado !== undefined && valorCalculado > 0) && (
+              <span className="text-amber-400 font-black text-[9px] md:text-[10px] leading-none flex items-center gap-1 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">
+                IA: ${valorCalculado.toLocaleString()}
+              </span>
+            )}
+          </div>
 
-      {/* Detalles del Auto */}
-      <div className="p-5 flex flex-col gap-2 relative z-10 bg-[#0b1120]">
-        <span className="text-xs font-semibold text-cyan-500 tracking-wider uppercase">{marca}</span>
-        <h3 className="text-xl font-bold text-slate-100 truncate">{modelo}</h3>
-        <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-800/50">
-          <span className="text-xs font-medium px-2 py-1 rounded bg-slate-800 text-slate-300">{rareza}</span>
-          <span className="text-sm font-bold text-emerald-400">${valor}</span>
         </div>
       </div>
     </div>

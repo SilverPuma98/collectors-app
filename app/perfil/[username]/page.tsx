@@ -1,9 +1,62 @@
+import React from 'react';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import CollectorCard from '@/components/CollectorCard';
 import Link from 'next/link';
 
+// 🧠 Importamos la misma librería de íconos que usamos en el Panel
+import { 
+  FaCar, FaMoneyBillWave, FaTrophy, FaWrench, FaGlobe, FaStar, FaInfinity, 
+  FaMoon, FaGem, FaTachometerAlt, FaFire, FaBox, FaTools, FaCrown, FaGhost, 
+  FaClock, FaHandshake, FaStore, FaMedal, FaCarCrash, FaBolt 
+} from 'react-icons/fa';
+import { GiRaceCar, GiSteeringWheel, GiCarKey, GiCheckeredFlag } from 'react-icons/gi';
+
 export const revalidate = 60;
+
+// ====================================================================
+// 🧠 FUNCIÓN DE ÍCONOS REUTILIZADA (Para que luzca idéntico al panel)
+// ====================================================================
+const getIconForAchievement = (logro: any) => {
+  const code = logro.codigo_regla || '';
+
+  // 🧠 SOLUCIÓN: Cambiamos JSX.Element por React.ReactNode
+  const iconMap: Record<string, React.ReactNode> = {
+    'CREADOR_SUPREMO': <FaInfinity className="w-5 h-5" />,
+    'CAZADOR_NOCTURNO': <FaGhost className="w-5 h-5" />,
+    'EARLY_BIRD': <FaClock className="w-5 h-5" />,
+    'CENA_POLLO': <FaCrown className="w-5 h-5" />,
+    'LA_VUELTA_MUNDO': <FaGlobe className="w-5 h-5" />,
+    'PRIMER_REGISTRO': <GiCarKey className="w-5 h-5" />,
+    'DIVERSIDAD_5': <GiCheckeredFlag className="w-5 h-5" />,
+    'DIVERSIDAD_10': <GiCheckeredFlag className="w-5 h-5" />,
+  };
+
+  if (iconMap[code]) return iconMap[code];
+
+  if (code.includes('HW_')) return <FaFire className="w-5 h-5" />;
+  if (code.includes('MBX_')) return <FaBox className="w-5 h-5" />;
+  if (code.includes('M2_') || code.includes('GL_')) return <FaTools className="w-5 h-5" />;
+  if (code.includes('FERRARI_') || code.includes('PORSCHE_') || code.includes('LAMBO_')) return <GiSteeringWheel className="w-5 h-5" />;
+  if (code.includes('JDM_') || code.includes('MGT_')) return <FaTachometerAlt className="w-5 h-5" />;
+  if (code.includes('MUSCLE_')) return <FaBolt className="w-5 h-5" />;
+  if (code.includes('EURO_')) return <GiRaceCar className="w-5 h-5" />; 
+  if (code.includes('VALOR_') || code.includes('TOP_')) return <FaMoneyBillWave className="w-5 h-5" />;
+  if (code.includes('VENTA_')) return <FaStore className="w-5 h-5" />;
+  if (code.includes('CAMBIO_')) return <FaHandshake className="w-5 h-5" />;
+  if (code.includes('STH_') || code.includes('CHASE_')) return <FaGem className="w-5 h-5" />;
+  if (code.includes('TH_')) return <FaStar className="w-5 h-5" />;
+  if (code.includes('RLC_') || code.includes('PREMIUM_')) return <FaCrown className="w-5 h-5" />;
+  if (code.includes('MINT_') || code.includes('EXHIBICION_')) return <FaStar className="w-5 h-5" />;
+  if (code.includes('LOOSE_')) return <FaCarCrash className="w-5 h-5" />;
+  if (code.includes('JUNK_')) return <FaWrench className="w-5 h-5" />;
+  if (code.includes('D70S_') || code.includes('D80S_') || code.includes('D90S_') || code.includes('D00S_')) return <FaClock className="w-5 h-5" />;
+  if (code.includes('CARROS_')) {
+    if (logro.rareza_logro === 'Oro' || logro.rareza_logro === 'Legendario') return <FaTrophy className="w-5 h-5" />;
+    return <FaCar className="w-5 h-5" />;
+  }
+  return <FaMedal className="w-5 h-5" />;
+};
 
 export default async function PerfilUsuario({ params }: { params: Promise<{ username: string }> }) {
   const resolvedParams = await params;
@@ -44,7 +97,7 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
     .eq('estado_aprobacion', 'APROBADO')
     .order('id_carro', { ascending: false });
 
-  // 3. Buscamos sus trofeos desbloqueados (¡NUEVO!)
+  // 3. Buscamos sus trofeos desbloqueados 
   const { data: logrosData } = await supabase
     .from('usuario_logro')
     .select('logro(*)')
@@ -72,9 +125,19 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
     }
   }
 
-  // Estadísticas
+  // 5. 👥 NUEVO: Contar los Seguidores y a quién Sigue
+  const [resSeguidores, resSiguiendo] = await Promise.all([
+    supabase.from('seguidor').select('*', { count: 'exact', head: true }).eq('seguido_id', perfil.id_usuario),
+    supabase.from('seguidor').select('*', { count: 'exact', head: true }).eq('seguidor_id', perfil.id_usuario)
+  ]);
+  
+  const totalSeguidores = resSeguidores.count || 0;
+  const totalSiguiendo = resSiguiendo.count || 0;
+
+  // 🧠 Separamos el valor del Dueño y el valor de la IA para mostrar ambos
   const totalAutos = carros ? carros.length : 0;
-  const valorTotal = carros ? carros.reduce((acc, curr) => acc + (curr.valor || 0), 0) : 0;
+  const valorTotalUsuario = carros ? carros.reduce((acc, curr) => acc + (curr.valor || 0), 0) : 0;
+  const valorTotalIA = carros ? carros.reduce((acc, curr) => acc + (curr.valor_calculado || 0), 0) : 0;
 
   const esMio = miIdUsuario === perfil.id_usuario;
   const esVendedor = perfil.rol === 'VENDEDOR' || perfil.rol === 'SUPER_ADMIN';
@@ -93,12 +156,13 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
 
   // Colores mini para las medallas
   const getMiniRarezaColor = (rareza: string) => {
-    switch (rareza) {
-      case "Legendario": return "border-purple-400 bg-purple-50 text-purple-600";
-      case "Oro": return "border-amber-400 bg-amber-50 text-amber-600";
-      case "Plata": return "border-slate-300 bg-slate-50 text-slate-600";
-      case "Bronce": return "border-orange-300 bg-orange-50 text-orange-600";
-      default: return "border-slate-200 bg-slate-50 text-slate-500";
+    switch (rareza?.toLowerCase()) {
+      case "mítico": return "border-cyan-400 bg-cyan-50 text-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.4)]";
+      case "legendario": return "border-purple-400 bg-purple-50 text-purple-500 shadow-[0_0_5px_rgba(168,85,247,0.3)]";
+      case "oro": return "border-amber-400 bg-amber-50 text-amber-500";
+      case "plata": return "border-slate-300 bg-slate-50 text-slate-500";
+      case "bronce": return "border-orange-300 bg-orange-50 text-orange-500";
+      default: return "border-slate-200 bg-slate-50 text-slate-400";
     }
   };
 
@@ -134,12 +198,25 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               📍 {ubicacion}
             </p>
 
-            {/* MINI LOGROS (Estilo Álbum de Estampas) */}
+            {/* 👥 NUEVO: Sección de Seguidores */}
+            <div className="flex justify-center md:justify-start gap-6 mb-4">
+              <div className="text-center">
+                <span className="text-lg font-black text-slate-800 block leading-none">{totalSeguidores}</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500">Seguidores</span>
+              </div>
+              <div className="text-center">
+                <span className="text-lg font-black text-slate-800 block leading-none">{totalSiguiendo}</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500">Siguiendo</span>
+              </div>
+            </div>
+
+            {/* 🧠 ACTUALIZADO: MINI LOGROS (Ahora con SVG Dinámicos en lugar de imágenes de enlace) */}
             {trofeos.length > 0 && (
               <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-4">
                 {trofeos.map((t: any) => (
-                  <div key={t.id_logro} className={`w-8 h-8 rounded-full border flex items-center justify-center p-1.5 relative group cursor-help transition-transform hover:scale-110 shadow-sm ${getMiniRarezaColor(t.rareza_logro)}`}>
-                    <img src={t.link_img_medalla || "/placeholder-medal.png"} alt={t.nombre} className="w-full h-full object-contain" />
+                  <div key={t.id_logro} className={`w-9 h-9 rounded-full border-2 flex items-center justify-center p-1.5 relative group cursor-help transition-transform hover:scale-110 shadow-sm ${getMiniRarezaColor(t.rareza_logro)}`}>
+                    {/* Renderizamos el ícono vectorial en chiquito */}
+                    {getIconForAchievement(t)}
                     
                     {/* Tooltip */}
                     <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20 whitespace-nowrap bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg">
@@ -151,14 +228,25 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               </div>
             )}
 
+            {/* ESTADÍSTICAS: Piezas y Valor IA */}
             <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-6">
               <div className="bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-center shadow-sm">
                 <p className="text-2xl font-black text-slate-800">{totalAutos}</p>
                 <p className="text-[10px] uppercase font-bold text-slate-500">Piezas</p>
               </div>
               <div className="bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-center shadow-sm">
-                <p className="text-2xl font-black text-emerald-600">${valorTotal.toLocaleString()}</p>
-                <p className="text-[10px] uppercase font-bold text-slate-500">Valor Colección</p>
+                <p className="text-2xl font-black text-slate-800">${valorTotalUsuario.toLocaleString()}</p>
+                <p className="text-[10px] uppercase font-bold text-slate-500">Valor Declarado</p>
+              </div>
+              <div className="bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl text-center shadow-sm relative group cursor-help">
+                <p className="text-2xl font-black text-cyan-700">${valorTotalIA.toLocaleString()}</p>
+                <p className="text-[10px] uppercase font-bold text-cyan-600 flex items-center justify-center gap-1">Valuación IA <span className="bg-cyan-600 text-white text-[8px] px-1 rounded">BETA</span></p>
+                
+                {/* Explicación del Valor IA */}
+                <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20 w-48 text-center bg-slate-900 text-white text-[10px] font-medium px-3 py-2 rounded-lg shadow-xl left-1/2 -translate-x-1/2">
+                  Suma del valor estimado de mercado calculado por nuestro algoritmo.
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
+                </div>
               </div>
             </div>
 
@@ -224,7 +312,7 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
                 {carro.para_venta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-md">💲 VENTA</div>}
                 {!carro.para_venta && carro.para_cambio && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-md">CAMBIO</div>}
                 
-                <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Desconocida"} rareza={carro.rareza || "Estándar"} valor={carro.valor} imagenUrl={carro.imagen_url} />
+                <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Desconocida"} rareza={carro.rareza || "Estándar"} valor={carro.valor} valorCalculado={carro.valor_calculado} imagenUrl={carro.imagen_url} />
               </Link>
             ))}
           </div>

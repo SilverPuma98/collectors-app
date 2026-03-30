@@ -74,6 +74,12 @@ export default function Navbar() {
               Inicio
             </Link>
 
+            {/* 🧠 NUEVO: Botón de Calculadora (Visible para todos) */}
+            <Link href="/calculadora" className="text-sm font-medium text-slate-300 hover:text-cyan-400 transition-colors flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+              Calculadora
+            </Link>
+
             {/* Opciones de Coleccionista (Solo si hay sesión) */}
             {sesion && (
               <>
@@ -124,15 +130,18 @@ export default function Navbar() {
             
             <Link href="/" onClick={cerrarMenu} className="text-slate-300 hover:text-white font-medium text-base">Inicio</Link>
             
+            {/* 🧠 NUEVO: Botón de Calculadora Móvil */}
+            <Link href="/calculadora" onClick={cerrarMenu} className="flex items-center gap-2 text-slate-300 hover:text-cyan-400 font-medium text-base">
+              <svg className="w-5 h-5 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+              Calculadora
+            </Link>
+            
             {sesion ? (
               <>
-                <Link href="/mi-garaje" onClick={cerrarMenu} className="flex items-center gap-2 text-emerald-400 font-bold bg-emerald-900/20 px-3 py-2 rounded-md border border-emerald-800 w-fit">
+                {/* 🛠️ CORRECCIÓN DE CORTESÍA: Cambié '/mi-garaje' por '/mi-panel' */}
+                <Link href="/mi-panel" onClick={cerrarMenu} className="flex items-center gap-2 text-emerald-400 font-bold bg-emerald-900/20 px-3 py-2 rounded-md border border-emerald-800 w-fit">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
-                  Mi Garaje
-                </Link>
-                <Link href="/perfil" onClick={cerrarMenu} className="flex items-center gap-2 text-slate-300 hover:text-cyan-400 font-medium text-base">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                  Mi Perfil
+                  Mi Panel
                 </Link>
                 
                 {esAdmin && (

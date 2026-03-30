@@ -1,14 +1,121 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import CollectorCard from "@/components/CollectorCard";
 import { evaluarLogros } from "@/lib/logrosEngine";
 import AchievementUnlock from "@/components/AchievementUnlock";
 import TrophyShowcase from "@/components/TrophyShowcase";
+import { calcularValorAproximado } from "@/lib/valuationEngine";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import imageCompression from 'browser-image-compression';
+
+// ========================================================================
+// 🧠 NUEVO COMPONENTE: Buscador Inteligente Desplegable (Combobox)
+// Permite buscar, filtrar y crear nuevos elementos sin romper el diseño
+// ========================================================================
+function BuscadorDesplegable({ 
+  opciones, 
+  valorSeleccionado, 
+  onSelect, 
+  placeholder, 
+  disabled = false,
+  permiteNuevo = true
+}: {
+  opciones: {id: string, label: string}[],
+  valorSeleccionado: string,
+  onSelect: (id: string, textoNuevo: string) => void,
+  placeholder: string,
+  disabled?: boolean,
+  permiteNuevo?: boolean
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Sincronizar el input con el valor seleccionado
+  useEffect(() => {
+    if (valorSeleccionado && valorSeleccionado !== "nuevo") {
+      const opt = opciones.find(o => o.id === valorSeleccionado);
+      if (opt) setBusqueda(opt.label);
+    } else if (valorSeleccionado !== "nuevo") {
+      setBusqueda("");
+    }
+  }, [valorSeleccionado, opciones]);
+
+  // Cerrar al dar clic afuera
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        // Si no seleccionó nada o borró, revertir
+        if (valorSeleccionado && valorSeleccionado !== "nuevo") {
+          const opt = opciones.find(o => o.id === valorSeleccionado);
+          if (opt) setBusqueda(opt.label);
+        } else if (valorSeleccionado !== "nuevo") {
+          setBusqueda("");
+        }
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [valorSeleccionado, opciones]);
+
+  const filtradas = opciones.filter(o => o.label.toLowerCase().includes(busqueda.toLowerCase()));
+  const exactMatch = opciones.some(o => o.label.toLowerCase() === busqueda.trim().toLowerCase());
+  const showAdd = permiteNuevo && busqueda.trim().length > 0 && !exactMatch;
+
+  return (
+    <div ref={wrapperRef} className="relative w-full">
+      <div className="relative">
+        <input
+          type="text"
+          value={busqueda}
+          onChange={e => {
+            setBusqueda(e.target.value);
+            setIsOpen(true);
+            if (valorSeleccionado && valorSeleccionado !== "nuevo") onSelect("", ""); // Reset si empieza a escribir otra cosa
+          }}
+          onFocus={() => setIsOpen(true)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-4 py-3 outline-none focus:border-cyan-500 transition-colors disabled:bg-slate-100 disabled:text-slate-400 placeholder:text-slate-400 shadow-sm"
+        />
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+          <svg className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+        </div>
+      </div>
+
+      {isOpen && !disabled && (
+        <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto divide-y divide-slate-100 ring-1 ring-black/5">
+          {filtradas.length === 0 && !showAdd && (
+            <div className="p-4 text-sm text-slate-500 text-center font-medium">No se encontraron resultados</div>
+          )}
+          {filtradas.map(opt => (
+            <div
+              key={opt.id}
+              onClick={() => { onSelect(opt.id, ""); setBusqueda(opt.label); setIsOpen(false); }}
+              className="p-3 hover:bg-cyan-50 hover:text-cyan-700 cursor-pointer text-sm font-medium text-slate-700 transition-colors"
+            >
+              {opt.label}
+            </div>
+          ))}
+          {showAdd && (
+            <div
+              onClick={() => { onSelect("nuevo", busqueda.trim()); setIsOpen(false); }}
+              className="p-3 bg-cyan-50 hover:bg-cyan-100 cursor-pointer text-sm font-black text-cyan-700 flex items-center gap-2 transition-colors sticky bottom-0"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+              Crear "{busqueda.trim()}"
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+// ========================================================================
 
 export default function MiPanelUsuario() {
   const router = useRouter();
@@ -17,9 +124,6 @@ export default function MiPanelUsuario() {
   
   const [tabActiva, setTabActiva] = useState("boveda"); 
 
-  // ==========================================
-  // ESTADOS: BÓVEDA
-  // ==========================================
   const [misCarros, setMisCarros] = useState<any[]>([]);
   const [fabricantes, setFabricantes] = useState<any[]>([]);
   const [marcas, setMarcas] = useState<any[]>([]);
@@ -43,15 +147,9 @@ export default function MiPanelUsuario() {
     no_carro: "", total_carros: "", anio_serie: "", para_cambio: false, para_venta: false
   });
 
-  // ==========================================
-  // ESTADOS: MODO RÁFAGA (VENDEDORES)
-  // ==========================================
   const [archivosRafaga, setArchivosRafaga] = useState<{ file: File, preview: string, modelo: string, id_marca: string, valor: string }[]>([]);
   const [subiendoRafaga, setSubiendoRafaga] = useState(false);
 
-  // ==========================================
-  // ESTADOS: PERFIL
-  // ==========================================
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [nombreUsuario, setNombreUsuario] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -93,11 +191,9 @@ export default function MiPanelUsuario() {
         }
       }
 
-      // Cargar Autos
       const { data: carrosData } = await supabase.from('carro').select(`*, marca(marca), serie(*), fabricante(fabricante)`).eq('id_usuario', perfilData.id_usuario).order('id_carro', { ascending: false });
       if (carrosData) setMisCarros(carrosData);
 
-      // Cargar Logros Completos y Ver cuáles tiene el usuario
       const { data: todosLosLogros } = await supabase.from('logro').select('*').order('id_logro', { ascending: true });
       const { data: misLogrosData } = await supabase.from('usuario_logro').select('id_logro').eq('id_usuario', perfilData.id_usuario);
       
@@ -112,13 +208,13 @@ export default function MiPanelUsuario() {
     }
 
     const [resFab, resMar, resSer, resRar, resEsc, resEstCarro, resEstMex] = await Promise.all([
-      supabase.from('fabricante').select('*').order('fabricante'),
-      supabase.from('marca').select('*').order('marca'),
-      supabase.from('serie').select('*'),
-      supabase.from('rareza').select('*'),
-      supabase.from('escala').select('*'),
-      supabase.from('estado_carro').select('*'),
-      supabase.from('estado').select('*').order('estado')
+      supabase.from('fabricante').select('*').order('fabricante', { ascending: true }),
+      supabase.from('marca').select('*').order('marca', { ascending: true }),
+      supabase.from('serie').select('*').order('serie', { ascending: true }),
+      supabase.from('rareza').select('*').order('rareza', { ascending: true }),
+      supabase.from('escala').select('*').order('escala', { ascending: true }),
+      supabase.from('estado_carro').select('*').order('estado_carro', { ascending: true }),
+      supabase.from('estado').select('*').order('estado', { ascending: true })
     ]);
     
     if (resFab.data) setFabricantes(resFab.data);
@@ -134,7 +230,7 @@ export default function MiPanelUsuario() {
 
   const cargarMunicipios = async (idEst: string | number) => {
     if (!idEst) { setMunicipios([]); return; }
-    const { data } = await supabase.from('municipio').select('*').eq('id_est', idEst).order('municipio');
+    const { data } = await supabase.from('municipio').select('*').eq('id_est', idEst).order('municipio', { ascending: true });
     if (data) setMunicipios(data);
   };
 
@@ -176,6 +272,22 @@ export default function MiPanelUsuario() {
   };
 
   useEffect(() => {
+    if (!cocheEditando && nuevoCarro.modelo && nuevoCarro.id_fabricante) {
+      const timeout = setTimeout(() => {
+        const fab = fabricantes.find(f => f.id_fabricante.toString() === nuevoCarro.id_fabricante)?.fabricante || nuevoCarro.otro_fabricante;
+        const est = estadosCarro.find(e => e.id_estado_carro.toString() === nuevoCarro.id_estado_carro)?.estado_carro || "";
+        const anioNum = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
+
+        const valorSugerido = calcularValorAproximado(nuevoCarro.modelo, fab, nuevoCarro.rareza, anioNum, est);
+        
+        setNuevoCarro(prev => ({ ...prev, valor: valorSugerido.toString() }));
+      }, 500); 
+
+      return () => clearTimeout(timeout);
+    }
+  }, [nuevoCarro.modelo, nuevoCarro.id_fabricante, nuevoCarro.otro_fabricante, nuevoCarro.rareza, nuevoCarro.anio_serie, nuevoCarro.id_estado_carro, cocheEditando]); 
+
+  useEffect(() => {
     if (nuevoCarro.id_serie && nuevoCarro.id_serie !== "nuevo") {
       const serieSeleccionada = series.find(s => s.id_serie === parseInt(nuevoCarro.id_serie));
       if (serieSeleccionada) setNuevoCarro(prev => ({ ...prev, total_carros: serieSeleccionada.no_carros ? serieSeleccionada.no_carros.toString() : "", anio_serie: serieSeleccionada.anio ? serieSeleccionada.anio.toString() : prev.anio_serie }));
@@ -202,9 +314,20 @@ export default function MiPanelUsuario() {
     const finalIdMar = await crearSiEsNuevo('marca', 'marca', nuevoCarro.id_marca, nuevoCarro.otra_marca);
     const finalIdSer = await crearSiEsNuevo('serie', 'serie', nuevoCarro.id_serie, nuevoCarro.otra_serie, { id_fabricante: finalIdFab, anio: parseInt(nuevoCarro.anio_serie) || null, no_carros: parseInt(nuevoCarro.total_carros) || null });
 
+    const finalAnio = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
+    const nombreEst = estadosCarro.find(e => e.id_estado_carro.toString() === nuevoCarro.id_estado_carro)?.estado_carro || "";
+    const nombreFab = fabricantes.find(f => f.id_fabricante.toString() === nuevoCarro.id_fabricante)?.fabricante || nuevoCarro.otro_fabricante;
+    
+    const nombreRareza = rarezas.find(r => r.id_rareza.toString() === nuevoCarro.rareza)?.rareza || nuevoCarro.rareza;
+    
+    const sugeridoIA = calcularValorAproximado(nuevoCarro.modelo, nombreFab, nombreRareza, finalAnio, nombreEst);
+
     const payload: any = {
       modelo: nuevoCarro.modelo, id_fabricante: finalIdFab, marca: finalIdMar, serie: finalIdSer,  
-      rareza: nuevoCarro.rareza, valor: parseFloat(nuevoCarro.valor) || 0, escala: parseInt(nuevoCarro.id_escala) || null, estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, no_carro: parseInt(nuevoCarro.no_carro) || null, 
+      rareza: nombreRareza, 
+      valor: parseFloat(nuevoCarro.valor) || 0,
+      valor_calculado: sugeridoIA,
+      escala: parseInt(nuevoCarro.id_escala) || null, estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, no_carro: parseInt(nuevoCarro.no_carro) || null, 
       para_cambio: nuevoCarro.para_cambio, para_venta: nuevoCarro.para_venta
     };
     if (imagenUrlFinal) payload.imagen_url = imagenUrlFinal;
@@ -235,6 +358,15 @@ export default function MiPanelUsuario() {
   const actualizarItemRafaga = (index: number, campo: string, valorStr: string) => {
     const copia = [...archivosRafaga];
     copia[index] = { ...copia[index], [campo]: valorStr };
+    
+    if (campo === 'modelo' || campo === 'id_marca') {
+       const mod = campo === 'modelo' ? valorStr : copia[index].modelo;
+       const idMar = campo === 'id_marca' ? valorStr : copia[index].id_marca;
+       if (mod && idMar) {
+         const precioSugerido = calcularValorAproximado(mod, "Hot Wheels", "Común", new Date().getFullYear(), "Blíster Excelente Condición");
+         copia[index].valor = precioSugerido.toString();
+       }
+    }
     setArchivosRafaga(copia);
   };
 
@@ -261,8 +393,12 @@ export default function MiPanelUsuario() {
         await supabase.storage.from('autos').upload(nombreArchivo, compressedFile);
         const { data: urlData } = supabase.storage.from('autos').getPublicUrl(nombreArchivo);
         
+        const precioSugeridoIA = calcularValorAproximado(item.modelo, "Hot Wheels", "Común", new Date().getFullYear(), "Blíster Excelente Condición");
+
         const payload = {
-          id_usuario: miPerfil.id_usuario, modelo: item.modelo, marca: parseInt(item.id_marca) || null, valor: parseFloat(item.valor) || 0,
+          id_usuario: miPerfil.id_usuario, modelo: item.modelo, marca: parseInt(item.id_marca) || null, 
+          valor: parseFloat(item.valor) || 0,
+          valor_calculado: precioSugeridoIA, 
           imagen_url: urlData.publicUrl, estado_aprobacion: 'APROBADO', para_venta: true, para_cambio: false 
         };
 
@@ -280,13 +416,33 @@ export default function MiPanelUsuario() {
     setTabActiva("boveda"); 
   };
 
-
   const abrirModalCarro = (carro: any = null) => {
     if (carro) {
       setCocheEditando(carro.id_carro);
       const idMarcaReal = marcas.find(m => m.marca === carro.marca?.marca)?.id_marca || "";
       const idSerieReal = carro.serie?.id_serie || "";
-      setNuevoCarro({ modelo: carro.modelo || "", id_fabricante: carro.id_fabricante ? carro.id_fabricante.toString() : "", otro_fabricante: "", id_marca: idMarcaReal.toString(), otra_marca: "", id_serie: idSerieReal.toString(), otra_serie: "", rareza: carro.rareza || "", valor: carro.valor ? carro.valor.toString() : "", id_escala: carro.escala ? carro.escala.toString() : "", id_estado_carro: carro.estado_carro ? carro.estado_carro.toString() : "", no_carro: carro.no_carro ? carro.no_carro.toString() : "", total_carros: carro.serie?.no_carros ? carro.serie.no_carros.toString() : "", anio_serie: carro.serie?.anio ? carro.serie.anio.toString() : "", para_cambio: carro.para_cambio || false, para_venta: carro.para_venta || false });
+      
+      // 🧠 CORRECCIÓN: Buscamos la rareza comparando NOMBRE y FABRICANTE
+      const idRarezaReal = rarezas.find(r => r.rareza === carro.rareza && r.id_fabricante === carro.id_fabricante)?.id_rareza || carro.rareza;
+
+      setNuevoCarro({ 
+        modelo: carro.modelo || "", 
+        id_fabricante: carro.id_fabricante ? carro.id_fabricante.toString() : "", 
+        otro_fabricante: "", 
+        id_marca: idMarcaReal.toString(), 
+        otra_marca: "", 
+        id_serie: idSerieReal.toString(), 
+        otra_serie: "", 
+        rareza: idRarezaReal.toString(), 
+        valor: carro.valor ? carro.valor.toString() : "", 
+        id_escala: carro.escala ? carro.escala.toString() : "", 
+        id_estado_carro: carro.estado_carro ? carro.estado_carro.toString() : "", 
+        no_carro: carro.no_carro ? carro.no_carro.toString() : "", 
+        total_carros: carro.serie?.no_carros ? carro.serie.no_carros.toString() : "", 
+        anio_serie: carro.serie?.anio ? carro.serie.anio.toString() : "", 
+        para_cambio: carro.para_cambio || false, 
+        para_venta: carro.para_venta || false 
+      });
       setFotoPreviewCarro(carro.imagen_url || null);
     } else {
       setCocheEditando(null); setFotoPreviewCarro(null);
@@ -306,11 +462,20 @@ export default function MiPanelUsuario() {
   const idFabAct = parseInt(nuevoCarro.id_fabricante) || null;
   const seriesFiltradas = idFabAct ? series.filter(s => s.id_fabricante === idFabAct) : series;
   const rarezasFiltradas = idFabAct ? rarezas.filter(r => r.id_fabricante === idFabAct) : rarezas;
+  
   const carrosFiltrados = misCarros.filter(carro => {
     if (!busqueda) return true;
     const termino = busqueda.toLowerCase();
     return carro.modelo?.toLowerCase().includes(termino) || carro.marca?.marca?.toLowerCase().includes(termino) || carro.serie?.serie?.toLowerCase().includes(termino) || carro.rareza?.toLowerCase().includes(termino) || carro.fabricante?.fabricante?.toLowerCase().includes(termino);
   });
+
+  // Mapeos para los Buscadores Desplegables
+  const opcionesFabricante = fabricantes.map(f => ({ id: f.id_fabricante.toString(), label: f.fabricante }));
+  const opcionesMarca = marcas.map(m => ({ id: m.id_marca.toString(), label: m.marca }));
+  const opcionesSerie = seriesFiltradas.map(s => ({ id: s.id_serie.toString(), label: `${s.serie} ${s.anio ? `(${s.anio})` : ''}` }));
+  const opcionesRareza = rarezasFiltradas.map(r => ({ id: r.id_rareza.toString(), label: r.rareza }));
+  const opcionesEstado = estadosCarro.map(e => ({ id: e.id_estado_carro.toString(), label: e.estado_carro }));
+  const opcionesEscala = escalas.map(e => ({ id: e.id_escala.toString(), label: e.escala }));
 
   if (cargandoDatos) return <div className="flex min-h-screen items-center justify-center text-cyan-600 bg-slate-50 animate-pulse font-bold tracking-widest">ABRIENDO PANEL...</div>;
 
@@ -338,18 +503,13 @@ export default function MiPanelUsuario() {
           <button onClick={() => setTabActiva("boveda")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "boveda" ? "bg-white border-2 border-cyan-500 shadow-md text-cyan-700" : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-700"}`}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg> Mi Bóveda
           </button>
-          
           <button onClick={() => setTabActiva("perfil")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "perfil" ? "bg-white border-2 border-cyan-500 shadow-md text-cyan-700" : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-700"}`}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> Configurar Perfil
           </button>
-
-          {/* NUEVA PESTAÑA: LOGROS */}
           <button onClick={() => setTabActiva("logros")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "logros" ? "bg-white border-2 border-cyan-500 shadow-md text-cyan-700" : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-700"}`}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg> 
             Álbum de Logros
           </button>
-          
-          {/* PESTAÑA EXCLUSIVA VENDEDORES */}
           {(miPerfil?.rol === 'VENDEDOR' || miPerfil?.rol === 'SUPER_ADMIN') && (
             <button onClick={() => setTabActiva("rafaga")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "rafaga" ? "bg-amber-50 border-2 border-amber-500 shadow-md text-amber-700" : "bg-transparent text-slate-500 hover:bg-amber-100/50 hover:text-amber-700"}`}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
@@ -389,7 +549,15 @@ export default function MiPanelUsuario() {
                         <button onClick={() => eliminarCarro(carro.id_carro)} className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg font-bold text-xs w-28 hover:bg-red-400">Eliminar</button>
                         <Link href={`/pieza/${carro.id_carro}`} className="bg-cyan-600 text-white px-4 py-2 rounded-lg shadow-lg font-bold text-xs w-28 text-center hover:bg-cyan-500 mt-2">Detalles</Link>
                       </div>
-                      <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} valor={carro.valor} imagenUrl={carro.imagen_url} />
+                      
+                      <CollectorCard 
+                        modelo={carro.modelo} 
+                        marca={carro.marca?.marca || "Sin Marca"} 
+                        rareza={carro.rareza || "Común"} 
+                        valor={carro.valor} 
+                        valorCalculado={carro.valor_calculado} 
+                        imagenUrl={carro.imagen_url} 
+                      />
                     </div>
                   ))}
                 </div>
@@ -402,7 +570,6 @@ export default function MiPanelUsuario() {
              <div className="max-w-2xl mx-auto animate-in fade-in duration-300">
                <h2 className="text-2xl font-black text-slate-800 mb-8 border-b border-slate-100 pb-4">Información de Coleccionista</h2>
                <form onSubmit={guardarPerfil} className="flex flex-col gap-8">
-                 
                  <div className="flex flex-col items-center sm:items-start sm:flex-row gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-200">
                    <div className="relative w-32 h-32 rounded-full border-4 border-white shadow-lg flex items-center justify-center cursor-pointer group overflow-hidden bg-slate-200 shrink-0">
                      <input type="file" accept="image/*" className="hidden" id="foto-perfil" onChange={(e) => { const f = e.target.files?.[0]; if(f){ setFotoArchivoPerfil(f); setFotoPreviewPerfil(URL.createObjectURL(f)); } }} />
@@ -434,7 +601,6 @@ export default function MiPanelUsuario() {
                    </div>
                  </div>
 
-                 {/* CAMPO DE GOOGLE MAPS PARA TIENDAS PRO */}
                  {miPerfil?.rol === 'VENDEDOR' && (
                   <div className="mt-4 border p-4 rounded-xl transition-colors border-slate-200 bg-slate-50 shadow-sm" >
                     <p className="text-sm font-bold flex items-center gap-2 text-slate-700 mb-2">📍 Ubicación Tienda (Google Maps)</p>
@@ -457,9 +623,7 @@ export default function MiPanelUsuario() {
             </div>
           )}
 
-          {/* =======================================================
-              PANTALLA 4: MODO RÁFAGA (SOLO TIENDAS/PRO)
-              ======================================================= */}
+          {/* PANTALLA 4: MODO RÁFAGA */}
           {tabActiva === "rafaga" && (
             <div className="animate-in fade-in duration-300">
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-8 flex flex-col md:flex-row items-center gap-6">
@@ -517,18 +681,19 @@ export default function MiPanelUsuario() {
         </main>
       </div>
 
-      {/* =======================================================
-          MODAL DE BÓVEDA (TEMA CLARO) - IGUAL AL ANTERIOR
-          ======================================================= */}
+      {/* =================================================================================================================
+          🧠 MODAL DE BÓVEDA CON BUSCADORES INTELIGENTES (COMBOBOX)
+          ================================================================================================================= */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full md:max-w-xl max-h-[90vh] overflow-y-auto rounded-t-3xl md:rounded-3xl shadow-2xl border border-slate-200">
-            <div className="sticky top-0 bg-white/95 backdrop-blur-md z-10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200 overflow-y-auto pt-10 pb-10">
+          <div className="bg-white w-full md:max-w-xl overflow-visible rounded-t-3xl md:rounded-3xl shadow-2xl border border-slate-200 my-auto">
+            <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 px-6 py-4 border-b border-slate-100 flex justify-between items-center rounded-t-3xl">
               <h3 className="text-xl font-black text-slate-800 tracking-tight">{cocheEditando ? "Editar Pieza" : "Nueva Pieza"}<span className="text-cyan-500">.</span></h3>
               <button onClick={cerrarModal} className="p-2 bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 rounded-full transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             
             <form onSubmit={guardarCarro} className="p-6 flex flex-col gap-6">
+              
               <div className="w-full">
                 <input type="file" accept="image/*" capture="environment" id="foto-carro" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if(f){ setFotoArchivoCarro(f); setFotoPreviewCarro(URL.createObjectURL(f)); } }} />
                 <label htmlFor="foto-carro" className={`w-full aspect-[4/3] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group shadow-inner ${fotoPreviewCarro ? 'border-cyan-300' : 'border-slate-300 hover:border-cyan-400 bg-slate-50'}`}>
@@ -541,56 +706,95 @@ export default function MiPanelUsuario() {
               </div>
 
               <div className="flex flex-col gap-4">
-                <div>
+                <div className="z-[36]">
                   <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Modelo del Auto *</label>
-                  <input type="text" required placeholder="Ej. Skyline GT-R R34" value={nuevoCarro.modelo} onChange={(e) => setNuevoCarro({...nuevoCarro, modelo: e.target.value})} className="w-full bg-slate-50 border border-slate-300 text-slate-900 font-medium rounded-xl px-4 py-3 outline-none focus:border-cyan-500" />
+                  <input type="text" required placeholder="Ej. Skyline GT-R R34" value={nuevoCarro.modelo} onChange={(e) => setNuevoCarro({...nuevoCarro, modelo: e.target.value})} className="w-full bg-slate-50 border border-slate-300 text-slate-900 font-medium rounded-xl px-4 py-3 outline-none focus:border-cyan-500 shadow-sm" />
                 </div>
+                
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                  <div className="z-[35]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Fabricante *</label>
-                    <select required value={nuevoCarro.id_fabricante} onChange={(e) => setNuevoCarro({...nuevoCarro, id_fabricante: e.target.value})} className="w-full bg-slate-50 border border-slate-300 text-slate-900 font-medium rounded-xl px-4 py-3 outline-none focus:border-cyan-500 cursor-pointer"><option value="">-- Seleccionar --</option>{fabricantes.map(f => <option key={f.id_fabricante} value={f.id_fabricante}>{f.fabricante}</option>)}<option value="nuevo" className="text-cyan-600 font-bold">+ Agregar Otro...</option></select>
-                    {nuevoCarro.id_fabricante === 'nuevo' && <input type="text" placeholder="¿Cuál?" value={nuevoCarro.otro_fabricante} onChange={e => setNuevoCarro({...nuevoCarro, otro_fabricante: e.target.value})} className="mt-2 w-full bg-white border border-cyan-300 text-slate-900 rounded-md px-3 py-2 text-sm outline-none shadow-sm" />}
+                    <BuscadorDesplegable 
+                      opciones={opcionesFabricante}
+                      valorSeleccionado={nuevoCarro.id_fabricante}
+                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, id_fabricante: id, otro_fabricante: text})}
+                      placeholder="Buscar o crear..."
+                    />
                   </div>
-                  <div>
+                  <div className="z-[34]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Marca de Auto *</label>
-                    <select required value={nuevoCarro.id_marca} onChange={(e) => setNuevoCarro({...nuevoCarro, id_marca: e.target.value})} className="w-full bg-slate-50 border border-slate-300 text-slate-900 font-medium rounded-xl px-4 py-3 outline-none focus:border-cyan-500 cursor-pointer"><option value="">-- Seleccionar --</option>{marcas.map(m => <option key={m.id_marca} value={m.id_marca}>{m.marca}</option>)}<option value="nuevo" className="text-cyan-600 font-bold">+ Agregar Otra...</option></select>
-                    {nuevoCarro.id_marca === 'nuevo' && <input type="text" placeholder="¿Cuál?" value={nuevoCarro.otra_marca} onChange={e => setNuevoCarro({...nuevoCarro, otra_marca: e.target.value})} className="mt-2 w-full bg-white border border-cyan-300 text-slate-900 rounded-md px-3 py-2 text-sm outline-none shadow-sm" />}
+                    <BuscadorDesplegable 
+                      opciones={opcionesMarca}
+                      valorSeleccionado={nuevoCarro.id_marca}
+                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, id_marca: id, otra_marca: text})}
+                      placeholder="Buscar o crear..."
+                    />
                   </div>
                 </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                  <div className="sm:col-span-5">
+                  <div className="sm:col-span-5 z-[33]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Serie (Filtrada)</label>
-                    <select disabled={!idFabAct && nuevoCarro.id_fabricante !== 'nuevo'} value={nuevoCarro.id_serie} onChange={(e) => setNuevoCarro({...nuevoCarro, id_serie: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-3 py-3 outline-none disabled:opacity-50 cursor-pointer"><option value="">-- Seleccionar --</option>{seriesFiltradas.map(s => <option key={s.id_serie} value={s.id_serie}>{s.serie}</option>)}<option value="nuevo" className="text-cyan-600 font-bold">+ Agregar Otra...</option></select>
-                    {nuevoCarro.id_serie === 'nuevo' && <input type="text" placeholder="¿Cuál?" value={nuevoCarro.otra_serie} onChange={e => setNuevoCarro({...nuevoCarro, otra_serie: e.target.value})} className="mt-2 w-full bg-white border border-cyan-300 text-slate-900 rounded-md px-3 py-2 text-sm outline-none" />}
+                    <BuscadorDesplegable 
+                      opciones={opcionesSerie}
+                      valorSeleccionado={nuevoCarro.id_serie}
+                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, id_serie: id, otra_serie: text})}
+                      placeholder="Ej. Exotics"
+                      disabled={!idFabAct && nuevoCarro.id_fabricante !== 'nuevo'}
+                    />
                   </div>
-                  <div className="sm:col-span-3 flex gap-2">
-                    <div className="w-1/2"><label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">No.</label><input type="number" placeholder="3" value={nuevoCarro.no_carro} onChange={(e) => setNuevoCarro({...nuevoCarro, no_carro: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center" /></div>
+                  <div className="sm:col-span-3 flex gap-2 z-[32]">
+                    <div className="w-1/2"><label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">No.</label><input type="number" placeholder="3" value={nuevoCarro.no_carro} onChange={(e) => setNuevoCarro({...nuevoCarro, no_carro: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center shadow-sm" /></div>
                     <div className="flex items-center pt-5 text-slate-400 font-bold">/</div>
-                    <div className="w-1/2"><label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Total</label><input type="number" placeholder="10" disabled={nuevoCarro.id_serie !== 'nuevo' && nuevoCarro.total_carros !== ""} value={nuevoCarro.total_carros} onChange={(e) => setNuevoCarro({...nuevoCarro, total_carros: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center disabled:bg-slate-100 disabled:text-slate-400" /></div>
+                    <div className="w-1/2"><label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Total</label><input type="number" placeholder="10" disabled={nuevoCarro.id_serie !== 'nuevo' && nuevoCarro.total_carros !== ""} value={nuevoCarro.total_carros} onChange={(e) => setNuevoCarro({...nuevoCarro, total_carros: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center disabled:bg-slate-100 disabled:text-slate-400 shadow-sm" /></div>
                   </div>
-                  <div className="sm:col-span-4">
+                  <div className="sm:col-span-4 z-[31]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Año</label>
-                    <select disabled={nuevoCarro.id_serie !== 'nuevo' && nuevoCarro.anio_serie !== ""} value={nuevoCarro.anio_serie} onChange={(e) => setNuevoCarro({...nuevoCarro, anio_serie: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-3 py-3 outline-none disabled:bg-slate-100 cursor-pointer"><option value="">-- Seleccionar --</option>{aniosDisponibles.map(anio => <option key={anio} value={anio}>{anio}</option>)}</select>
+                    <select disabled={nuevoCarro.id_serie !== 'nuevo' && nuevoCarro.anio_serie !== ""} value={nuevoCarro.anio_serie} onChange={(e) => setNuevoCarro({...nuevoCarro, anio_serie: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-3 py-3 outline-none disabled:bg-slate-100 cursor-pointer shadow-sm"><option value="">-- Seleccionar --</option>{aniosDisponibles.map(anio => <option key={anio} value={anio}>{anio}</option>)}</select>
                   </div>
                 </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                  <div className="z-[30]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Estado</label>
-                    <select value={nuevoCarro.id_estado_carro} onChange={(e) => setNuevoCarro({...nuevoCarro, id_estado_carro: e.target.value})} className="w-full bg-slate-50 border border-slate-300 text-slate-900 font-medium rounded-xl px-4 py-3 outline-none cursor-pointer focus:border-cyan-500"><option value="">-- Seleccionar --</option>{estadosCarro.map(ec => <option key={ec.id_estado_carro} value={ec.id_estado_carro}>{ec.estado_carro}</option>)}</select>
+                    <BuscadorDesplegable 
+                      opciones={opcionesEstado}
+                      valorSeleccionado={nuevoCarro.id_estado_carro}
+                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, id_estado_carro: id})}
+                      placeholder="Seleccionar..."
+                      permiteNuevo={false} // No queremos que los usuarios inventen estados raros
+                    />
                   </div>
-                  <div>
+                  <div className="z-[29]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Escala</label>
-                    <select value={nuevoCarro.id_escala} onChange={(e) => setNuevoCarro({...nuevoCarro, id_escala: e.target.value})} className="w-full bg-slate-50 border border-slate-300 text-slate-900 font-medium rounded-xl px-4 py-3 outline-none cursor-pointer focus:border-cyan-500"><option value="">-- Seleccionar --</option>{escalas.map(es => <option key={es.id_escala} value={es.id_escala}>{es.escala}</option>)}</select>
+                    <BuscadorDesplegable 
+                      opciones={opcionesEscala}
+                      valorSeleccionado={nuevoCarro.id_escala}
+                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, id_escala: id})}
+                      placeholder="Seleccionar..."
+                      permiteNuevo={false}
+                    />
                   </div>
                 </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                  <div className="z-[28]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Rareza</label>
-                    <select disabled={!idFabAct} value={nuevoCarro.rareza} onChange={(e) => setNuevoCarro({...nuevoCarro, rareza: e.target.value})} className="w-full bg-slate-50 border border-slate-300 text-slate-900 font-medium rounded-xl px-4 py-3 outline-none disabled:opacity-50 cursor-pointer focus:border-cyan-500"><option value="">-- Seleccionar --</option>{rarezasFiltradas.map(r => <option key={r.id_rareza} value={r.rareza}>{r.rareza}</option>)}</select>
+                    <BuscadorDesplegable 
+                      opciones={opcionesRareza}
+                      valorSeleccionado={nuevoCarro.rareza}
+                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, rareza: id})}
+                      placeholder="Variante..."
+                      disabled={!idFabAct}
+                      permiteNuevo={false} // La rareza la controlamos en la BD para la IA
+                    />
                   </div>
-                  <div>
-                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Valor Estimado ($)</label>
-                    <input type="number" step="0.01" placeholder="0.00" value={nuevoCarro.valor} onChange={(e) => setNuevoCarro({...nuevoCarro, valor: e.target.value})} className="w-full bg-slate-50 border border-slate-300 text-emerald-600 font-black rounded-xl px-4 py-3 outline-none focus:border-cyan-500" />
+                  <div className="z-[27]">
+                    <div className="flex justify-between items-end mb-1">
+                      <label className="text-xs text-slate-500 font-bold uppercase tracking-wider block">Valor Estimado ($)</label>
+                      {!cocheEditando && nuevoCarro.modelo && <span className="text-[9px] bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-bold">Autocalculado 🤖</span>}
+                    </div>
+                    <input type="number" step="0.01" placeholder="0.00" value={nuevoCarro.valor} onChange={(e) => setNuevoCarro({...nuevoCarro, valor: e.target.value})} className="w-full bg-slate-50 border border-slate-300 text-emerald-600 font-black rounded-xl px-4 py-3 outline-none focus:border-cyan-500 shadow-sm" />
                   </div>
                 </div>
 
