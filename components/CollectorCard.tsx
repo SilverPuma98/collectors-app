@@ -4,12 +4,13 @@ interface CollectorCardProps {
   modelo: string;
   marca: string;
   rareza: string;
+  presentacion?: string; // 📦 NUEVO: Recibe la presentación
   valor: number;
-  valorCalculado?: number; // 🧠 NUEVO: Recibe el valor de la IA
+  valorCalculado?: number; // 🧠 Recibe el valor de la IA
   imagenUrl?: string;
 }
 
-export default function CollectorCard({ modelo, marca, rareza, valor, valorCalculado, imagenUrl }: CollectorCardProps) {
+export default function CollectorCard({ modelo, marca, rareza, presentacion, valor, valorCalculado, imagenUrl }: CollectorCardProps) {
   return (
     <div className="bg-[#0b1120] border border-slate-800 rounded-2xl overflow-hidden shadow-lg hover:border-cyan-800 transition-colors w-full flex flex-col h-full">
       
@@ -29,14 +30,22 @@ export default function CollectorCard({ modelo, marca, rareza, valor, valorCalcu
           <h3 className="text-xs md:text-sm font-black text-white leading-tight line-clamp-2">{modelo}</h3>
         </div>
         
-        {/* PIE DE TARJETA: RAREZA Y PRECIOS */}
+        {/* PIE DE TARJETA: RAREZA, PRESENTACIÓN Y PRECIOS */}
         <div className="flex justify-between items-end mt-auto pt-2 border-t border-slate-800/50 gap-2">
           
-          <span className="text-[9px] md:text-[10px] font-medium bg-slate-800 text-slate-300 px-2 py-1 rounded-md max-w-[45%] truncate">
-            {rareza}
-          </span>
+          <div className="flex flex-col gap-1 w-[55%]">
+            {/* 📦 ETIQUETA DE PRESENTACIÓN (Se oculta si es el individual normal) */}
+            {presentacion && presentacion !== "Individual Básico" && presentacion !== "" && (
+               <span className="text-[8px] md:text-[9px] font-bold bg-indigo-900/40 text-indigo-300 border border-indigo-700/50 px-1.5 py-0.5 rounded w-max max-w-full truncate shadow-sm">
+                 📦 {presentacion}
+               </span>
+            )}
+            <span className="text-[9px] md:text-[10px] font-medium bg-slate-800 text-slate-300 px-2 py-1 rounded-md w-max max-w-full truncate">
+              {rareza}
+            </span>
+          </div>
           
-          <div className="flex flex-col items-end gap-1.5">
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
             {/* Valor del Dueño (Blanco) */}
             <span className="text-white font-bold text-xs md:text-sm leading-none">
               ${valor ? valor.toLocaleString() : '0'}

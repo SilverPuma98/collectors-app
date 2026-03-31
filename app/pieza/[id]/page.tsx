@@ -23,6 +23,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
       marca(marca),
       fabricante(fabricante),
       serie(*),
+      presentacion(presentacion),
       escala_rel:escala(escala),
       estado_carro_rel:estado_carro(estado_carro),
       usuario:id_usuario(id_usuario, nombre_usuario, link_img_perf, whatsapp, facebook, correo, rol)
@@ -77,7 +78,6 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
     <main className="min-h-screen bg-slate-50 selection:bg-cyan-200 selection:text-cyan-900 pb-20 font-sans">
       
       <div className="max-w-6xl mx-auto px-4 pt-6 md:pt-10">
-        {/* CORRECCIÓN: Ahora te regresa al perfil del dueño en lugar de ir al inicio */}
         <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="inline-flex items-center gap-2 text-slate-500 hover:text-cyan-600 transition-colors font-bold text-sm bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
           Volver al Perfil
@@ -98,11 +98,20 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               </div>
             )}
             
-            <div className="absolute top-4 left-4 z-20 bg-white/90 backdrop-blur-md border border-slate-200 text-slate-800 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-md">
-              {carro.rareza || 'ESTÁNDAR'}
+            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2 items-start">
+              {/* Etiqueta de Rareza */}
+              <div className="bg-white/90 backdrop-blur-md border border-slate-200 text-slate-800 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-md">
+                {carro.rareza || 'ESTÁNDAR'}
+              </div>
+              {/* 📦 ETIQUETA NUEVA DE PRESENTACIÓN SOBRE LA FOTO */}
+              {carro.presentacion?.presentacion && carro.presentacion.presentacion !== 'Individual Básico' && (
+                <div className="bg-indigo-900/80 backdrop-blur-md border border-indigo-500/50 text-indigo-100 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-1">
+                  📦 {carro.presentacion.presentacion}
+                </div>
+              )}
             </div>
             
-            {/* Etiquetas Dinámicas */}
+            {/* Etiquetas Dinámicas (Venta / Cambio) */}
             {esVenta ? (
               <div className="absolute top-4 right-4 z-20 bg-amber-500/90 backdrop-blur-md border border-amber-400 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1">
                 💲 EN VENTA
@@ -146,6 +155,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
           </h1>
           <p className="text-xl text-cyan-600 font-bold mb-8">{carro.marca?.marca || 'Marca Desconocida'} • {carro.fabricante?.fabricante || 'Sin Fabricante'}</p>
 
+          {/* 📦 CUADRÍCULA DE CARACTERÍSTICAS ACTUALIZADA */}
           <div className="grid grid-cols-2 gap-4 mb-8">
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
               <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Serie / Año</p>
@@ -162,6 +172,15 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
               <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Condición</p>
               <p className="text-sm text-emerald-600 font-bold">{carro.estado_carro_rel?.estado_carro || 'No especificada'}</p>
+            </div>
+            
+            {/* 📦 NUEVO CUADRITO DE PRESENTACIÓN (Ocupa las 2 columnas si es necesario) */}
+            <div className="col-span-2 bg-indigo-50 border border-indigo-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs text-indigo-500 uppercase font-bold tracking-wider mb-1">Empaque Original</p>
+                <p className="text-sm text-indigo-900 font-black">{carro.presentacion?.presentacion || 'Individual Básico'}</p>
+              </div>
+              <div className="text-3xl">📦</div>
             </div>
           </div>
 

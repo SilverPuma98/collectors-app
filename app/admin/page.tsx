@@ -17,6 +17,7 @@ export default function AdminDashboard() {
   const [fabricantes, setFabricantes] = useState<any[]>([]);
   const [series, setSeries] = useState<any[]>([]);
   const [rarezas, setRarezas] = useState<any[]>([]);
+  const [presentaciones, setPresentaciones] = useState<any[]>([]); // 📦 NUEVO ESTADO: Presentaciones
   const [escalas, setEscalas] = useState<any[]>([]);
   const [estadosCarro, setEstadosCarro] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]); 
@@ -32,6 +33,7 @@ export default function AdminDashboard() {
   const [nuevoFabricante, setNuevoFabricante] = useState("");
   const [nuevaSerie, setNuevaSerie] = useState({ serie: "", anio: "", no_carros: "", id_fabricante: "" });
   const [nuevaRareza, setNuevaRareza] = useState({ rareza: "", id_fabricante: "" });
+  const [nuevaPresentacion, setNuevaPresentacion] = useState({ presentacion: "", id_fabricante: "" }); // 📦 NUEVO FORMULARIO: Presentaciones
   const [nuevaEscala, setNuevaEscala] = useState("");
   const [nuevoEstadoCarro, setNuevoEstadoCarro] = useState("");
 
@@ -56,11 +58,13 @@ export default function AdminDashboard() {
   };
 
   const cargarTodosLosDatos = async (rol: string) => {
-    const [resMar, resFab, resSer, resRar, resEsc, resEst, resCoc] = await Promise.all([
+    // 📦 AGREGAMOS LA CONSULTA DE PRESENTACIONES
+    const [resMar, resFab, resSer, resRar, resPres, resEsc, resEst, resCoc] = await Promise.all([
       supabase.from('marca').select('*').order('id_marca', { ascending: true }),
       supabase.from('fabricante').select('*').order('id_fabricante', { ascending: true }),
       supabase.from('serie').select('*').order('id_serie', { ascending: true }),
       supabase.from('rareza').select('*').order('id_rareza', { ascending: true }),
+      supabase.from('presentacion').select('*').order('id_presentacion', { ascending: true }), 
       supabase.from('escala').select('*').order('id_escala', { ascending: true }),
       supabase.from('estado_carro').select('*').order('id_estado_carro', { ascending: true }),
       supabase.from('carro').select('*, marca(marca), serie(serie)').order('estado_aprobacion', { ascending: false })
@@ -70,6 +74,7 @@ export default function AdminDashboard() {
     if (resFab.data) setFabricantes(resFab.data);
     if (resSer.data) setSeries(resSer.data);
     if (resRar.data) setRarezas(resRar.data);
+    if (resPres.data) setPresentaciones(resPres.data); // 📦 GUARDAMOS PRESENTACIONES
     if (resEsc.data) setEscalas(resEsc.data);
     if (resEst.data) setEstadosCarro(resEst.data);
     if (resCoc.data) setCoches(resCoc.data);
@@ -85,6 +90,7 @@ export default function AdminDashboard() {
   const fabricantesFiltrados = fabricantes.filter(f => f.fabricante.toLowerCase().includes(busqueda.toLowerCase()));
   const seriesFiltradas = series.filter(s => s.serie.toLowerCase().includes(busqueda.toLowerCase()));
   const rarezasFiltradas = rarezas.filter(r => r.rareza.toLowerCase().includes(busqueda.toLowerCase()));
+  const presentacionesFiltradas = presentaciones.filter(p => p.presentacion.toLowerCase().includes(busqueda.toLowerCase())); // 📦 FILTRO PRESENTACIONES
   const escalasFiltradas = escalas.filter(e => e.escala.toLowerCase().includes(busqueda.toLowerCase()));
   const estadosFiltrados = estadosCarro.filter(e => e.estado_carro.toLowerCase().includes(busqueda.toLowerCase()));
   const cochesFiltrados = coches.filter(c => c.modelo.toLowerCase().includes(busqueda.toLowerCase()));
@@ -95,6 +101,7 @@ export default function AdminDashboard() {
     setNuevaMarca(""); setNuevoFabricante(""); setNuevaEscala(""); setNuevoEstadoCarro("");
     setNuevaSerie({ serie: "", anio: "", no_carros: "", id_fabricante: "" }); 
     setNuevaRareza({ rareza: "", id_fabricante: "" });
+    setNuevaPresentacion({ presentacion: "", id_fabricante: "" }); // 📦 RESET PRESENTACIONES
     setModalAbierto(tipo);
   };
 
@@ -104,6 +111,7 @@ export default function AdminDashboard() {
     if (tipo === "fabricante") setNuevoFabricante(item.fabricante);
     if (tipo === "serie") setNuevaSerie({ serie: item.serie, anio: item.anio || "", no_carros: item.no_carros || "", id_fabricante: item.id_fabricante });
     if (tipo === "rareza") setNuevaRareza({ rareza: item.rareza, id_fabricante: item.id_fabricante });
+    if (tipo === "presentacion") setNuevaPresentacion({ presentacion: item.presentacion, id_fabricante: item.id_fabricante }); // 📦 CARGAR PRESENTACIONES
     if (tipo === "escala") setNuevaEscala(item.escala);
     if (tipo === "estado") setNuevoEstadoCarro(item.estado_carro);
     setModalAbierto(tipo);
@@ -135,6 +143,14 @@ export default function AdminDashboard() {
     e.preventDefault(); setCargando(true); 
     const payload = { rareza: nuevaRareza.rareza, id_fabricante: parseInt(nuevaRareza.id_fabricante) }; 
     const { error } = itemEditando ? await supabase.from('rareza').update(payload).eq('id_rareza', itemEditando.id_rareza) : await supabase.from('rareza').insert([payload]); 
+    if (error) alert("Error al guardar: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); 
+  };
+
+  // 📦 NUEVA FUNCIÓN: GUARDAR PRESENTACIÓN
+  const guardarPresentacion = async (e: React.FormEvent) => { 
+    e.preventDefault(); setCargando(true); 
+    const payload = { presentacion: nuevaPresentacion.presentacion, id_fabricante: parseInt(nuevaPresentacion.id_fabricante) }; 
+    const { error } = itemEditando ? await supabase.from('presentacion').update(payload).eq('id_presentacion', itemEditando.id_presentacion) : await supabase.from('presentacion').insert([payload]); 
     if (error) alert("Error al guardar: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); 
   };
   
@@ -195,6 +211,10 @@ export default function AdminDashboard() {
           <button onClick={() => setTabActiva("fabricantes")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "fabricantes" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Fabricantes</button>
           <button onClick={() => setTabActiva("series")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "series" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Series</button>
           <button onClick={() => setTabActiva("rarezas")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "rarezas" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Rarezas</button>
+          
+          {/* 📦 NUEVO BOTÓN: PRESENTACIONES EN EL MENÚ LATERAL */}
+          <button onClick={() => setTabActiva("presentaciones")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "presentaciones" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Presentaciones</button>
+          
           <button onClick={() => setTabActiva("escalas")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "escalas" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Escalas</button>
           <button onClick={() => setTabActiva("estados")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "estados" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Est. Autos</button>
           
@@ -221,7 +241,7 @@ export default function AdminDashboard() {
             <input type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full md:w-1/2 bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-2 focus:border-cyan-500 outline-none" />
             
             {(tabActiva !== "usuarios" && tabActiva !== "coches") && (
-              <button onClick={() => abrirModalCrear(tabActiva === 'estados' ? 'estado' : tabActiva.slice(0, -1))} className="w-full md:w-auto bg-cyan-700 hover:bg-cyan-600 text-white px-4 py-2 rounded-md font-bold">
+              <button onClick={() => abrirModalCrear(tabActiva === 'estados' ? 'estado' : tabActiva === 'presentaciones' ? 'presentacion' : tabActiva.slice(0, -1))} className="w-full md:w-auto bg-cyan-700 hover:bg-cyan-600 text-white px-4 py-2 rounded-md font-bold">
                 + Nuevo Registro
               </button>
             )}
@@ -238,6 +258,7 @@ export default function AdminDashboard() {
                   {tabActiva === "estados" && <th className="pb-3 font-medium">Estado del Auto</th>}
                   {tabActiva === "series" && <><th className="pb-3 font-medium">Serie</th><th className="pb-3 font-medium">Fabricante</th><th className="pb-3 text-center font-medium">Año</th><th className="pb-3 text-center font-medium">Autos</th></>}
                   {tabActiva === "rarezas" && <><th className="pb-3 font-medium">Nivel de Rareza</th><th className="pb-3 font-medium">Fabricante</th></>}
+                  {tabActiva === "presentaciones" && <><th className="pb-3 font-medium">Presentación / Empaque</th><th className="pb-3 font-medium">Fabricante</th></>}
                   {tabActiva === "usuarios" && <><th className="pb-3 font-medium">Usuario / Correo</th><th className="pb-3 font-medium">Rol</th></>}
                   {tabActiva === "coches" && <><th className="pb-3 font-medium">Auto</th><th className="pb-3 font-medium">Estatus</th><th className="pb-3 font-medium text-center">Valor</th></>}
                   <th className="pb-3 text-right pr-2 font-medium">Acciones</th>
@@ -293,6 +314,16 @@ export default function AdminDashboard() {
                   );
                 })}
 
+                {tabActiva === "presentaciones" && presentacionesFiltradas.map((p) => {
+                  const nombreFabricante = fabricantes.find(f => f.id_fabricante === p.id_fabricante)?.fabricante || "Desconocido";
+                  return (
+                    <tr key={p.id_presentacion} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                      <td className="py-3 pl-2 text-slate-500">#{p.id_presentacion}</td><td className="py-3 font-semibold text-amber-400">{p.presentacion}</td><td className="py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{nombreFabricante}</span></td>
+                      <td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('presentacion', p)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('presentacion', 'id_presentacion', p.id_presentacion)} className="text-red-500 font-bold p-2">Eliminar</button>}</td>
+                    </tr>
+                  );
+                })}
+
                 {miRol === 'SUPER_ADMIN' && tabActiva === "usuarios" && usuariosFiltrados.map((u) => (
                   <tr key={u.id_usuario} className="border-b border-slate-800/50 hover:bg-slate-800/30">
                     <td className="py-3 pl-2 text-slate-500">#{u.id_usuario}</td><td className="py-3"><div className="font-semibold text-slate-200">{u.nombre_usuario || "Sin Nombre"}</div><div className="text-xs text-slate-500">{u.correo}</div></td>
@@ -337,12 +368,12 @@ export default function AdminDashboard() {
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl w-full max-w-sm">
             <h3 className="text-lg font-bold text-white mb-4 capitalize">{itemEditando ? `Editar ${modalAbierto}` : `Nuevo ${modalAbierto}`}</h3>
             
-            {/* ESTE FORMULARIO AHORA ATRAPA ERRORES Y SABE EXACTAMENTE QUÉ FUNCIÓN LLAMAR */}
             <form onSubmit={(e) => {
               if (modalAbierto === 'marca') guardarMarca(e);
               else if (modalAbierto === 'fabricante') guardarFabricante(e);
               else if (modalAbierto === 'serie') guardarSerie(e);
               else if (modalAbierto === 'rareza') guardarRareza(e);
+              else if (modalAbierto === 'presentacion') guardarPresentacion(e); // 📦 SUBMIT DE PRESENTACIONES
               else if (modalAbierto === 'escala') guardarEscala(e);
               else if (modalAbierto === 'estado') guardarEstadoCarro(e);
             }} className="flex flex-col gap-4">
@@ -379,8 +410,19 @@ export default function AdminDashboard() {
                 </>
               )}
 
+              {/* 📦 NUEVO FORMULARIO: PRESENTACIÓN */}
+              {modalAbierto === 'presentacion' && (
+                <>
+                  <select required value={nuevaPresentacion.id_fabricante} onChange={(e) => setNuevaPresentacion({...nuevaPresentacion, id_fabricante: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none cursor-pointer">
+                    <option value="">-- Selecciona Fabricante --</option>
+                    {fabricantes.map(f => <option key={f.id_fabricante} value={f.id_fabricante}>{f.fabricante}</option>)}
+                  </select>
+                  <input type="text" required placeholder="Ej. 5-Pack, Team Transport..." value={nuevaPresentacion.presentacion} onChange={(e) => setNuevaPresentacion({...nuevaPresentacion, presentacion: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none" />
+                </>
+              )}
+
               <div className="flex justify-end gap-3 mt-4">
-                <button type="button" onClick={() => setModalAbierto(null)} className="text-slate-400 p-2 font-bold">Cancelar</button>
+                <button type="button" onClick={() => setModalAbierto(null)} className="text-slate-400 p-2 font-bold hover:text-white transition-colors">Cancelar</button>
                 <button type="submit" disabled={cargando} className="bg-cyan-700 hover:bg-cyan-600 text-white px-4 py-2 rounded-md font-bold transition-colors">{cargando ? "Guardando..." : "Guardar"}</button>
               </div>
             </form>

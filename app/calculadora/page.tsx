@@ -4,121 +4,87 @@ import { useState, useEffect } from "react";
 import { calcularValorAproximado } from "@/lib/valuationEngine";
 import Link from "next/link";
 
-// 🧠 DICCIONARIO DE RAREZAS POR FABRICANTE
-// Aquí controlamos qué opciones aparecen dependiendo de la marca seleccionada
+// 🧠 DICCIONARIO DE RAREZAS PURAS
 const mapaRarezas: Record<string, string[]> = {
   "Hot Wheels": [
     "Básico / Común", 
-    "Premium (Goma/Metal)", 
     "Treasure Hunt (TH)", 
     "Super Treasure Hunt (STH)", 
     "RLC / Convención / Elite", 
     "Zamac / Variante de Tienda",
-    "5-Pack / Multipack",
-    "Brick Shop / Mega Construx",
     "Fast & Furious"
   ],
   "Matchbox": [
     "Básico / Común", 
-    "Premium (Goma/Metal)", 
-    "Super Chase",
-    "5-Pack / Multipack"
+    "Super Chase"
   ],
   "Majorette": [
     "Básico / Común", 
-    "Premium (Goma/Metal)", 
     "Chase"
   ],
-  "Maisto / Bburago": [
-    "Básico / Común", 
-    "Premium"
-  ],
-  "Jada Toys": [
-    "Básico / Común", 
-    "Chase"
-  ],
-  "Greenlight": [
-    "Básico / Común", 
-    "Green Machine", 
-    "Raw Metal"
-  ],
-  "M2 Machines": [
-    "Básico / Común", 
-    "Chase", 
-    "Super Chase / Raw Metal"
-  ],
-  "Mini GT": [
-    "Básico / Común", 
-    "Chase",
-    "MiJo Exclusives"
-  ],
-  "Inno64 / Tarmac": [
-    "Básico / Común", 
-    "Chase",
-    "Edición Especial"
-  ],
-  "Kaido House": [
-    "Básico / Común", 
-    "Chase", 
-    "Super Chase / Raw Metal"
-  ],
-  "Pop Race": [
-    "Básico / Común",
-    "Edición Especial"
-  ],
-  "Tomica / TLV": [
-    "Básico / Común", 
-    "Premium (Tomica Limited Vintage)",
-    "Edición Especial"
-  ],
-  "Kyosho": [
-    "Básico / Común",
-    "Edición Especial"
-  ],
-  "AutoArt": [
-    "Premium (Goma/Metal)"
-  ],
-  "PGM": [
-    "Premium (Goma/Metal)", 
-    "Chase"
-  ]
+  "Maisto / Bburago": ["Básico / Común"],
+  "Jada Toys": ["Básico / Común", "Chase"],
+  "Greenlight": ["Básico / Común", "Green Machine", "Raw Metal"],
+  "M2 Machines": ["Básico / Común", "Chase", "Super Chase / Raw Metal"],
+  "Mini GT": ["Básico / Común", "Chase", "MiJo Exclusives"],
+  "Inno64 / Tarmac": ["Básico / Común", "Chase", "Edición Especial"],
+  "Kaido House": ["Básico / Común", "Chase", "Super Chase / Raw Metal"],
+  "Pop Race": ["Básico / Común", "Edición Especial"],
+  "Tomica / TLV": ["Básico / Común", "Edición Especial"],
+  "Kyosho": ["Básico / Común", "Edición Especial"],
+  "AutoArt": ["Edición Especial"],
+  "PGM": ["Edición Especial", "Chase"]
 };
+
+// 📦 LISTA DE PRESENTACIONES ACTUALIZADA CON TUS NUEVOS VALORES
+const listaPresentaciones = [
+  "Individual Básico",
+  "Silver Series", // NUEVO
+  "Premium (Individual)",
+  "Premium Box", // NUEVO
+  "Team Transport",
+  "2-Pack",
+  "3-Pack",
+  "5-Pack / Multipack",
+  "Diorama / Box Set",
+  "Moving Parts",
+  "UNIQUELY IDENTIFIABLE VEHICLES", // NUEVO
+  "Brick Shop / Mega Construx"
+];
 
 export default function CalculadoraPage() {
   const [modelo, setModelo] = useState("");
   const [fabricante, setFabricante] = useState("Hot Wheels");
-  const [rareza, setRareza] = useState("Básico / Común"); // Valor inicial por defecto
+  const [rareza, setRareza] = useState("Básico / Común"); 
+  const [presentacion, setPresentacion] = useState("Individual Básico"); 
   const [anio, setAnio] = useState<string>("");
   const [estado, setEstado] = useState("Blíster Excelente Condición");
   
   const [valorCalculado, setValorCalculado] = useState(0);
   const [animando, setAnimando] = useState(false);
 
-  // 🔄 EFECTO EN CASCADA: Cuando cambia el fabricante, actualizamos la rareza
   const manejarCambioFabricante = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nuevoFabricante = e.target.value;
     setFabricante(nuevoFabricante);
-    
-    // Reseteamos la rareza a la primera opción disponible del nuevo fabricante
-    // para evitar que se quede guardada una rareza incompatible (Ej. STH en M2)
     const opcionesDisponibles = mapaRarezas[nuevoFabricante];
     if (opcionesDisponibles && opcionesDisponibles.length > 0) {
       setRareza(opcionesDisponibles[0]);
+    } else {
+      setRareza("Básico / Común");
     }
   };
 
   useEffect(() => {
-    // Efecto visual de cálculo
     setAnimando(true);
     const timeout = setTimeout(() => {
       const anioNum = parseInt(anio) || new Date().getFullYear();
-      const valor = calcularValorAproximado(modelo, fabricante, rareza, anioNum, estado);
+      const valor = calcularValorAproximado(modelo, fabricante, rareza, presentacion, anioNum, estado);
       setValorCalculado(valor);
       setAnimando(false);
     }, 400); 
 
     return () => clearTimeout(timeout);
-  }, [modelo, fabricante, rareza, anio, estado]);
+  }, [modelo, fabricante, rareza, presentacion, anio, estado]); 
 
   return (
     <main className="min-h-screen bg-[#050810] p-4 md:p-8 selection:bg-cyan-900 selection:text-cyan-50 flex items-center justify-center font-sans">
@@ -156,13 +122,13 @@ export default function CalculadoraPage() {
                     {Object.keys(mapaRarezas).map((fab) => (
                       <option key={fab} value={fab}>{fab}</option>
                     ))}
+                    <option value="Otra Marca">Otra Marca (Premium)</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-cyan-600 font-bold uppercase tracking-wider mb-2 block">Rareza / Variante</label>
                   <select value={rareza} onChange={(e) => setRareza(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:border-cyan-500 cursor-pointer appearance-none">
-                    {/* Aquí renderizamos dinámicamente las opciones del fabricante actual */}
-                    {mapaRarezas[fabricante]?.map((opcion) => (
+                    {(mapaRarezas[fabricante] || ["Básico / Común"]).map((opcion) => (
                       <option key={opcion} value={opcion}>{opcion}</option>
                     ))}
                   </select>
@@ -171,21 +137,28 @@ export default function CalculadoraPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="text-xs text-cyan-600 font-bold uppercase tracking-wider mb-2 block">Presentación / Empaque</label>
+                  <select value={presentacion} onChange={(e) => setPresentacion(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:border-cyan-500 cursor-pointer appearance-none">
+                    {listaPresentaciones.map(pres => <option key={pres} value={pres}>{pres}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="text-xs text-cyan-600 font-bold uppercase tracking-wider mb-2 block">Año de Salida</label>
                   <input type="number" placeholder="Ej. 2018" value={anio} onChange={(e) => setAnio(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:border-cyan-500 transition-colors placeholder:text-slate-700" />
                 </div>
-                <div>
-                  <label className="text-xs text-cyan-600 font-bold uppercase tracking-wider mb-2 block">Estado Físico</label>
-                  <select value={estado} onChange={(e) => setEstado(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:border-cyan-500 cursor-pointer appearance-none">
-                    <option value="Blíster Excelente Condición">Blíster Excelente Condición</option>
-                    <option value="Blíster Buena Condición">Blíster Buena Condición</option>
-                    <option value="Blíster Mala Condición">Blíster Mala Condición</option>
-                    <option value="Loose">Loose</option>
-                    <option value="Buena Condición">Buena Condición (Suelto)</option>
-                    <option value="Mal Estado">Mal Estado</option>
-                    <option value="Chatarra">Chatarra</option>
-                  </select>
-                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-cyan-600 font-bold uppercase tracking-wider mb-2 block">Estado Físico</label>
+                <select value={estado} onChange={(e) => setEstado(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:border-cyan-500 cursor-pointer appearance-none">
+                  <option value="Blíster Excelente Condición">Blíster Excelente Condición</option>
+                  <option value="Blíster Buena Condición">Blíster Buena Condición</option>
+                  <option value="Blíster Mala Condición">Blíster Mala Condición</option>
+                  <option value="Loose">Loose</option>
+                  <option value="Buena Condición">Buena Condición (Suelto)</option>
+                  <option value="Mal Estado">Mal Estado</option>
+                  <option value="Chatarra">Chatarra</option>
+                </select>
               </div>
 
             </div>

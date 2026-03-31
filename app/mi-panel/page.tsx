@@ -12,8 +12,7 @@ import { useRouter } from "next/navigation";
 import imageCompression from 'browser-image-compression';
 
 // ========================================================================
-// 🧠 NUEVO COMPONENTE: Buscador Inteligente Desplegable (Combobox)
-// Permite buscar, filtrar y crear nuevos elementos sin romper el diseño
+// 🧠 COMPONENTE: Buscador Inteligente Desplegable (Combobox)
 // ========================================================================
 function BuscadorDesplegable({ 
   opciones, 
@@ -34,7 +33,6 @@ function BuscadorDesplegable({
   const [busqueda, setBusqueda] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Sincronizar el input con el valor seleccionado
   useEffect(() => {
     if (valorSeleccionado && valorSeleccionado !== "nuevo") {
       const opt = opciones.find(o => o.id === valorSeleccionado);
@@ -44,12 +42,10 @@ function BuscadorDesplegable({
     }
   }, [valorSeleccionado, opciones]);
 
-  // Cerrar al dar clic afuera
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        // Si no seleccionó nada o borró, revertir
         if (valorSeleccionado && valorSeleccionado !== "nuevo") {
           const opt = opciones.find(o => o.id === valorSeleccionado);
           if (opt) setBusqueda(opt.label);
@@ -75,7 +71,7 @@ function BuscadorDesplegable({
           onChange={e => {
             setBusqueda(e.target.value);
             setIsOpen(true);
-            if (valorSeleccionado && valorSeleccionado !== "nuevo") onSelect("", ""); // Reset si empieza a escribir otra cosa
+            if (valorSeleccionado && valorSeleccionado !== "nuevo") onSelect("", ""); 
           }}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
@@ -129,6 +125,7 @@ export default function MiPanelUsuario() {
   const [marcas, setMarcas] = useState<any[]>([]);
   const [series, setSeries] = useState<any[]>([]);
   const [rarezas, setRarezas] = useState<any[]>([]);
+  const [presentaciones, setPresentaciones] = useState<any[]>([]); 
   const [escalas, setEscalas] = useState<any[]>([]);
   const [estadosCarro, setEstadosCarro] = useState<any[]>([]);
   const [busqueda, setBusqueda] = useState(""); 
@@ -141,9 +138,10 @@ export default function MiPanelUsuario() {
   const [nuevosLogros, setNuevosLogros] = useState<string[]>([]);
   const [misTrofeos, setMisTrofeos] = useState<any[]>([]);
 
+  // 📦 Añadimos `otra_presentacion` para capturar el texto si el usuario crea una nueva
   const [nuevoCarro, setNuevoCarro] = useState({
     modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "",
-    id_serie: "", otra_serie: "", rareza: "", valor: "", id_escala: "", id_estado_carro: "", 
+    id_serie: "", otra_serie: "", rareza: "", id_presentacion: "", otra_presentacion: "", valor: "", id_escala: "", id_estado_carro: "", 
     no_carro: "", total_carros: "", anio_serie: "", para_cambio: false, para_venta: false
   });
 
@@ -191,7 +189,7 @@ export default function MiPanelUsuario() {
         }
       }
 
-      const { data: carrosData } = await supabase.from('carro').select(`*, marca(marca), serie(*), fabricante(fabricante)`).eq('id_usuario', perfilData.id_usuario).order('id_carro', { ascending: false });
+      const { data: carrosData } = await supabase.from('carro').select(`*, marca(marca), serie(*), fabricante(fabricante), presentacion(presentacion)`).eq('id_usuario', perfilData.id_usuario).order('id_carro', { ascending: false });
       if (carrosData) setMisCarros(carrosData);
 
       const { data: todosLosLogros } = await supabase.from('logro').select('*').order('id_logro', { ascending: true });
@@ -207,11 +205,12 @@ export default function MiPanelUsuario() {
       }
     }
 
-    const [resFab, resMar, resSer, resRar, resEsc, resEstCarro, resEstMex] = await Promise.all([
+    const [resFab, resMar, resSer, resRar, resPres, resEsc, resEstCarro, resEstMex] = await Promise.all([
       supabase.from('fabricante').select('*').order('fabricante', { ascending: true }),
       supabase.from('marca').select('*').order('marca', { ascending: true }),
       supabase.from('serie').select('*').order('serie', { ascending: true }),
       supabase.from('rareza').select('*').order('rareza', { ascending: true }),
+      supabase.from('presentacion').select('*').order('presentacion', { ascending: true }),
       supabase.from('escala').select('*').order('escala', { ascending: true }),
       supabase.from('estado_carro').select('*').order('estado_carro', { ascending: true }),
       supabase.from('estado').select('*').order('estado', { ascending: true })
@@ -221,6 +220,7 @@ export default function MiPanelUsuario() {
     if (resMar.data) setMarcas(resMar.data);
     if (resSer.data) setSeries(resSer.data);
     if (resRar.data) setRarezas(resRar.data);
+    if (resPres.data) setPresentaciones(resPres.data);
     if (resEsc.data) setEscalas(resEsc.data);
     if (resEstCarro.data) setEstadosCarro(resEstCarro.data);
     if (resEstMex.data) setEstadosMexico(resEstMex.data);
@@ -274,19 +274,26 @@ export default function MiPanelUsuario() {
   useEffect(() => {
     if (!cocheEditando && nuevoCarro.modelo && nuevoCarro.id_fabricante) {
       const timeout = setTimeout(() => {
+        // Convertimos IDs a Nombres reales para que la IA entienda
         const fab = fabricantes.find(f => f.id_fabricante.toString() === nuevoCarro.id_fabricante)?.fabricante || nuevoCarro.otro_fabricante;
         const est = estadosCarro.find(e => e.id_estado_carro.toString() === nuevoCarro.id_estado_carro)?.estado_carro || "";
         const anioNum = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
+        
+        // 🚨 AQUÍ ESTABA EL ERROR: Buscamos el NOMBRE de la rareza
+        const nombreRar = rarezas.find(r => r.id_rareza.toString() === nuevoCarro.rareza)?.rareza || nuevoCarro.rareza;
+        
+        // Buscamos el NOMBRE de la presentación
+        const nombrePres = presentaciones.find(p => p.id_presentacion.toString() === nuevoCarro.id_presentacion)?.presentacion || nuevoCarro.otra_presentacion || "Individual Básico";
 
-        const valorSugerido = calcularValorAproximado(nuevoCarro.modelo, fab, nuevoCarro.rareza, anioNum, est);
+        // Enviamos NOMBRES, no IDs
+        const valorSugerido = calcularValorAproximado(nuevoCarro.modelo, fab, nombreRar, nombrePres, anioNum, est);
         
         setNuevoCarro(prev => ({ ...prev, valor: valorSugerido.toString() }));
       }, 500); 
 
       return () => clearTimeout(timeout);
     }
-  }, [nuevoCarro.modelo, nuevoCarro.id_fabricante, nuevoCarro.otro_fabricante, nuevoCarro.rareza, nuevoCarro.anio_serie, nuevoCarro.id_estado_carro, cocheEditando]); 
-
+  }, [nuevoCarro.modelo, nuevoCarro.id_fabricante, nuevoCarro.otro_fabricante, nuevoCarro.rareza, nuevoCarro.id_presentacion, nuevoCarro.otra_presentacion, nuevoCarro.anio_serie, nuevoCarro.id_estado_carro, cocheEditando]);
   useEffect(() => {
     if (nuevoCarro.id_serie && nuevoCarro.id_serie !== "nuevo") {
       const serieSeleccionada = series.find(s => s.id_serie === parseInt(nuevoCarro.id_serie));
@@ -313,18 +320,22 @@ export default function MiPanelUsuario() {
     const finalIdFab = await crearSiEsNuevo('fabricante', 'fabricante', nuevoCarro.id_fabricante, nuevoCarro.otro_fabricante);
     const finalIdMar = await crearSiEsNuevo('marca', 'marca', nuevoCarro.id_marca, nuevoCarro.otra_marca);
     const finalIdSer = await crearSiEsNuevo('serie', 'serie', nuevoCarro.id_serie, nuevoCarro.otra_serie, { id_fabricante: finalIdFab, anio: parseInt(nuevoCarro.anio_serie) || null, no_carros: parseInt(nuevoCarro.total_carros) || null });
+    
+    // 📦 CREAR PRESENTACIÓN SI ES NUEVA Y OBTENER SU ID
+    const finalIdPres = await crearSiEsNuevo('presentacion', 'presentacion', nuevoCarro.id_presentacion, nuevoCarro.otra_presentacion, { id_fabricante: finalIdFab });
 
     const finalAnio = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
     const nombreEst = estadosCarro.find(e => e.id_estado_carro.toString() === nuevoCarro.id_estado_carro)?.estado_carro || "";
     const nombreFab = fabricantes.find(f => f.id_fabricante.toString() === nuevoCarro.id_fabricante)?.fabricante || nuevoCarro.otro_fabricante;
-    
     const nombreRareza = rarezas.find(r => r.id_rareza.toString() === nuevoCarro.rareza)?.rareza || nuevoCarro.rareza;
+    const nombrePres = presentaciones.find(p => p.id_presentacion.toString() === nuevoCarro.id_presentacion)?.presentacion || nuevoCarro.otra_presentacion || "Individual Básico";
     
-    const sugeridoIA = calcularValorAproximado(nuevoCarro.modelo, nombreFab, nombreRareza, finalAnio, nombreEst);
+    const sugeridoIA = calcularValorAproximado(nuevoCarro.modelo, nombreFab, nombreRareza, nombrePres, finalAnio, nombreEst);
 
     const payload: any = {
       modelo: nuevoCarro.modelo, id_fabricante: finalIdFab, marca: finalIdMar, serie: finalIdSer,  
       rareza: nombreRareza, 
+      id_presentacion: finalIdPres || null, // 📦 GUARDAMOS EL ID FINAL
       valor: parseFloat(nuevoCarro.valor) || 0,
       valor_calculado: sugeridoIA,
       escala: parseInt(nuevoCarro.id_escala) || null, estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, no_carro: parseInt(nuevoCarro.no_carro) || null, 
@@ -363,7 +374,7 @@ export default function MiPanelUsuario() {
        const mod = campo === 'modelo' ? valorStr : copia[index].modelo;
        const idMar = campo === 'id_marca' ? valorStr : copia[index].id_marca;
        if (mod && idMar) {
-         const precioSugerido = calcularValorAproximado(mod, "Hot Wheels", "Común", new Date().getFullYear(), "Blíster Excelente Condición");
+         const precioSugerido = calcularValorAproximado(mod, "Hot Wheels", "Común", "Individual Básico", new Date().getFullYear(), "Blíster Excelente Condición");
          copia[index].valor = precioSugerido.toString();
        }
     }
@@ -393,7 +404,7 @@ export default function MiPanelUsuario() {
         await supabase.storage.from('autos').upload(nombreArchivo, compressedFile);
         const { data: urlData } = supabase.storage.from('autos').getPublicUrl(nombreArchivo);
         
-        const precioSugeridoIA = calcularValorAproximado(item.modelo, "Hot Wheels", "Común", new Date().getFullYear(), "Blíster Excelente Condición");
+        const precioSugeridoIA = calcularValorAproximado(item.modelo, "Hot Wheels", "Común", "Individual Básico", new Date().getFullYear(), "Blíster Excelente Condición");
 
         const payload = {
           id_usuario: miPerfil.id_usuario, modelo: item.modelo, marca: parseInt(item.id_marca) || null, 
@@ -422,7 +433,6 @@ export default function MiPanelUsuario() {
       const idMarcaReal = marcas.find(m => m.marca === carro.marca?.marca)?.id_marca || "";
       const idSerieReal = carro.serie?.id_serie || "";
       
-      // 🧠 CORRECCIÓN: Buscamos la rareza comparando NOMBRE y FABRICANTE
       const idRarezaReal = rarezas.find(r => r.rareza === carro.rareza && r.id_fabricante === carro.id_fabricante)?.id_rareza || carro.rareza;
 
       setNuevoCarro({ 
@@ -434,6 +444,8 @@ export default function MiPanelUsuario() {
         id_serie: idSerieReal.toString(), 
         otra_serie: "", 
         rareza: idRarezaReal.toString(), 
+        id_presentacion: carro.id_presentacion ? carro.id_presentacion.toString() : "", 
+        otra_presentacion: "", // Limpiamos la captura manual
         valor: carro.valor ? carro.valor.toString() : "", 
         id_escala: carro.escala ? carro.escala.toString() : "", 
         id_estado_carro: carro.estado_carro ? carro.estado_carro.toString() : "", 
@@ -446,7 +458,7 @@ export default function MiPanelUsuario() {
       setFotoPreviewCarro(carro.imagen_url || null);
     } else {
       setCocheEditando(null); setFotoPreviewCarro(null);
-      setNuevoCarro({ modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "", id_serie: "", otra_serie: "", rareza: "", valor: "", id_escala: "", id_estado_carro: "", no_carro: "", total_carros: "", anio_serie: "", para_cambio: false, para_venta: false });
+      setNuevoCarro({ modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "", id_serie: "", otra_serie: "", rareza: "", id_presentacion: "", otra_presentacion: "", valor: "", id_escala: "", id_estado_carro: "", no_carro: "", total_carros: "", anio_serie: "", para_cambio: false, para_venta: false });
     }
     setFotoArchivoCarro(null); setIsModalOpen(true);
   };
@@ -462,6 +474,7 @@ export default function MiPanelUsuario() {
   const idFabAct = parseInt(nuevoCarro.id_fabricante) || null;
   const seriesFiltradas = idFabAct ? series.filter(s => s.id_fabricante === idFabAct) : series;
   const rarezasFiltradas = idFabAct ? rarezas.filter(r => r.id_fabricante === idFabAct) : rarezas;
+  const presentacionesFiltradas = idFabAct ? presentaciones.filter(p => p.id_fabricante === idFabAct) : presentaciones; 
   
   const carrosFiltrados = misCarros.filter(carro => {
     if (!busqueda) return true;
@@ -469,11 +482,11 @@ export default function MiPanelUsuario() {
     return carro.modelo?.toLowerCase().includes(termino) || carro.marca?.marca?.toLowerCase().includes(termino) || carro.serie?.serie?.toLowerCase().includes(termino) || carro.rareza?.toLowerCase().includes(termino) || carro.fabricante?.fabricante?.toLowerCase().includes(termino);
   });
 
-  // Mapeos para los Buscadores Desplegables
   const opcionesFabricante = fabricantes.map(f => ({ id: f.id_fabricante.toString(), label: f.fabricante }));
   const opcionesMarca = marcas.map(m => ({ id: m.id_marca.toString(), label: m.marca }));
   const opcionesSerie = seriesFiltradas.map(s => ({ id: s.id_serie.toString(), label: `${s.serie} ${s.anio ? `(${s.anio})` : ''}` }));
   const opcionesRareza = rarezasFiltradas.map(r => ({ id: r.id_rareza.toString(), label: r.rareza }));
+  const opcionesPresentacion = presentacionesFiltradas.map(p => ({ id: p.id_presentacion.toString(), label: p.presentacion })); 
   const opcionesEstado = estadosCarro.map(e => ({ id: e.id_estado_carro.toString(), label: e.estado_carro }));
   const opcionesEscala = escalas.map(e => ({ id: e.id_escala.toString(), label: e.escala }));
 
@@ -554,6 +567,7 @@ export default function MiPanelUsuario() {
                         modelo={carro.modelo} 
                         marca={carro.marca?.marca || "Sin Marca"} 
                         rareza={carro.rareza || "Común"} 
+                        presentacion={carro.presentacion?.presentacion}
                         valor={carro.valor} 
                         valorCalculado={carro.valor_calculado} 
                         imagenUrl={carro.imagen_url} 
@@ -732,8 +746,34 @@ export default function MiPanelUsuario() {
                   </div>
                 </div>
 
+                {/* 📦 NUEVA SECCIÓN: PRESENTACIÓN Y RAREZA JUNTAS (Mejor diseño) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="z-[33]">
+                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block flex items-center gap-1">📦 Presentación / Empaque</label>
+                    <BuscadorDesplegable 
+                      opciones={opcionesPresentacion}
+                      valorSeleccionado={nuevoCarro.id_presentacion}
+                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, id_presentacion: id, otra_presentacion: text})} // 📦 AGREGADA `otra_presentacion: text` PARA CREAR NUEVAS
+                      placeholder="Ej. 5-Pack, Individual..."
+                      disabled={!idFabAct}
+                      permiteNuevo={true} // 📦 HABILITADO PARA TODOS LOS USUARIOS
+                    />
+                  </div>
+                  <div className="z-[32]">
+                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block flex items-center gap-1">💎 Nivel de Rareza</label>
+                    <BuscadorDesplegable 
+                      opciones={opcionesRareza}
+                      valorSeleccionado={nuevoCarro.rareza}
+                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, rareza: id})}
+                      placeholder="Variante (TH, Chase...)"
+                      disabled={!idFabAct}
+                      permiteNuevo={false}
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                  <div className="sm:col-span-5 z-[33]">
+                  <div className="sm:col-span-5 z-[31]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Serie (Filtrada)</label>
                     <BuscadorDesplegable 
                       opciones={opcionesSerie}
@@ -743,29 +783,29 @@ export default function MiPanelUsuario() {
                       disabled={!idFabAct && nuevoCarro.id_fabricante !== 'nuevo'}
                     />
                   </div>
-                  <div className="sm:col-span-3 flex gap-2 z-[32]">
+                  <div className="sm:col-span-3 flex gap-2 z-[30]">
                     <div className="w-1/2"><label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">No.</label><input type="number" placeholder="3" value={nuevoCarro.no_carro} onChange={(e) => setNuevoCarro({...nuevoCarro, no_carro: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center shadow-sm" /></div>
                     <div className="flex items-center pt-5 text-slate-400 font-bold">/</div>
                     <div className="w-1/2"><label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Total</label><input type="number" placeholder="10" disabled={nuevoCarro.id_serie !== 'nuevo' && nuevoCarro.total_carros !== ""} value={nuevoCarro.total_carros} onChange={(e) => setNuevoCarro({...nuevoCarro, total_carros: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center disabled:bg-slate-100 disabled:text-slate-400 shadow-sm" /></div>
                   </div>
-                  <div className="sm:col-span-4 z-[31]">
+                  <div className="sm:col-span-4 z-[29]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Año</label>
                     <select disabled={nuevoCarro.id_serie !== 'nuevo' && nuevoCarro.anio_serie !== ""} value={nuevoCarro.anio_serie} onChange={(e) => setNuevoCarro({...nuevoCarro, anio_serie: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-3 py-3 outline-none disabled:bg-slate-100 cursor-pointer shadow-sm"><option value="">-- Seleccionar --</option>{aniosDisponibles.map(anio => <option key={anio} value={anio}>{anio}</option>)}</select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="z-[30]">
-                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Estado</label>
+                  <div className="z-[28]">
+                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Estado Físico</label>
                     <BuscadorDesplegable 
                       opciones={opcionesEstado}
                       valorSeleccionado={nuevoCarro.id_estado_carro}
                       onSelect={(id, text) => setNuevoCarro({...nuevoCarro, id_estado_carro: id})}
                       placeholder="Seleccionar..."
-                      permiteNuevo={false} // No queremos que los usuarios inventen estados raros
+                      permiteNuevo={false} 
                     />
                   </div>
-                  <div className="z-[29]">
+                  <div className="z-[27]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Escala</label>
                     <BuscadorDesplegable 
                       opciones={opcionesEscala}
@@ -778,18 +818,7 @@ export default function MiPanelUsuario() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="z-[28]">
-                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Rareza</label>
-                    <BuscadorDesplegable 
-                      opciones={opcionesRareza}
-                      valorSeleccionado={nuevoCarro.rareza}
-                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, rareza: id})}
-                      placeholder="Variante..."
-                      disabled={!idFabAct}
-                      permiteNuevo={false} // La rareza la controlamos en la BD para la IA
-                    />
-                  </div>
-                  <div className="z-[27]">
+                  <div className="z-[26] sm:col-start-2">
                     <div className="flex justify-between items-end mb-1">
                       <label className="text-xs text-slate-500 font-bold uppercase tracking-wider block">Valor Estimado ($)</label>
                       {!cocheEditando && nuevoCarro.modelo && <span className="text-[9px] bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-bold">Autocalculado 🤖</span>}
