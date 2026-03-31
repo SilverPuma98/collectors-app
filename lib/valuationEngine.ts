@@ -103,7 +103,7 @@ export function calcularValorAproximado(
     'mercedes', 'amg', 'g-wagon', 'audi', 'rs6', 'quattro', 'alfa romeo', 'giulia', 'batmobile'
   ];
   
-  if (highDemand.some(k => modelo.toLowerCase().includes(k))) D = 1.6;
+  if (highDemand.some(k => modelo.toLowerCase().includes(k))) D = 1.4;
   else if (midDemand.some(k => modelo.toLowerCase().includes(k))) D = 1.2;
   else if (modelo.toLowerCase().includes('fantasy')) D = 0.8; 
 
