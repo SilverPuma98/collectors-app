@@ -49,6 +49,10 @@ export function calcularValorAproximado(
   else if (rar.includes('treasure hunt') || rar.includes('th')) Q = 3.0;
   // Premium General (Aumenta el precio base de tienda, además del factor Q)
   else if (rar.includes('premium') || rar.includes('car culture') || rar.includes('boulevard')) { P_retail = 150; Q = 1.5; } 
+  // 🧠 NUEVO: 5-Packs / Multipacks
+  else if (rar.includes('5-pack') || rar.includes('5 pack') || rar.includes('multipack')) { P_retail = 200; Q = 1.2; }
+  // 🧠 CORRECCIÓN: Línea Brick Shop / Mega Construx (Precio base ajustado a $350)
+  else if (rar.includes('brick') || rar.includes('mega construx')) { P_retail = 350; Q = 1.1; }
 
   // 3. Condición / Estado Físico (C) 
   let C = 1.0;
@@ -71,7 +75,8 @@ export function calcularValorAproximado(
     'porsche', '911', '930', '964', 'gt3', 'taycan', 'ferrari', 'f40', 'f50', 'enzo', 'laferrari', 
     'lamborghini', 'countach', 'huracan', 'aventador', 'miura', 'bugatti', 'chiron', 'veyron', 'eb110',
     'mclaren', 'f1', 'senna', 'pagani', 'zonda', 'huayra', 'koenigsegg', 'jesko',
-    'kool kombi', 'gasser', '55 chevy gasser', 'bone shaker', 'drag bus', 'moon eyes', 'sthw', 'th'
+    'kool kombi', 'gasser', '55 chevy gasser', 'bone shaker', 'drag bus', 'moon eyes', 'sthw', 'th',
+    'fast & furious', 'fast and furious', 'f&f', 'tokyo drift', 'paul walker', "brian o'conner", 'toretto'
   ];
   const midDemand = [
     'mustang', 'shelby', 'eleanor', 'camaro', 'charger', 'challenger', 'corvette', 'stingray', 

@@ -4,15 +4,108 @@ import { useState, useEffect } from "react";
 import { calcularValorAproximado } from "@/lib/valuationEngine";
 import Link from "next/link";
 
+// 🧠 DICCIONARIO DE RAREZAS POR FABRICANTE
+// Aquí controlamos qué opciones aparecen dependiendo de la marca seleccionada
+const mapaRarezas: Record<string, string[]> = {
+  "Hot Wheels": [
+    "Básico / Común", 
+    "Premium (Goma/Metal)", 
+    "Treasure Hunt (TH)", 
+    "Super Treasure Hunt (STH)", 
+    "RLC / Convención / Elite", 
+    "Zamac / Variante de Tienda",
+    "5-Pack / Multipack",
+    "Brick Shop / Mega Construx",
+    "Fast & Furious"
+  ],
+  "Matchbox": [
+    "Básico / Común", 
+    "Premium (Goma/Metal)", 
+    "Super Chase",
+    "5-Pack / Multipack"
+  ],
+  "Majorette": [
+    "Básico / Común", 
+    "Premium (Goma/Metal)", 
+    "Chase"
+  ],
+  "Maisto / Bburago": [
+    "Básico / Común", 
+    "Premium"
+  ],
+  "Jada Toys": [
+    "Básico / Común", 
+    "Chase"
+  ],
+  "Greenlight": [
+    "Básico / Común", 
+    "Green Machine", 
+    "Raw Metal"
+  ],
+  "M2 Machines": [
+    "Básico / Común", 
+    "Chase", 
+    "Super Chase / Raw Metal"
+  ],
+  "Mini GT": [
+    "Básico / Común", 
+    "Chase",
+    "MiJo Exclusives"
+  ],
+  "Inno64 / Tarmac": [
+    "Básico / Común", 
+    "Chase",
+    "Edición Especial"
+  ],
+  "Kaido House": [
+    "Básico / Común", 
+    "Chase", 
+    "Super Chase / Raw Metal"
+  ],
+  "Pop Race": [
+    "Básico / Común",
+    "Edición Especial"
+  ],
+  "Tomica / TLV": [
+    "Básico / Común", 
+    "Premium (Tomica Limited Vintage)",
+    "Edición Especial"
+  ],
+  "Kyosho": [
+    "Básico / Común",
+    "Edición Especial"
+  ],
+  "AutoArt": [
+    "Premium (Goma/Metal)"
+  ],
+  "PGM": [
+    "Premium (Goma/Metal)", 
+    "Chase"
+  ]
+};
+
 export default function CalculadoraPage() {
   const [modelo, setModelo] = useState("");
   const [fabricante, setFabricante] = useState("Hot Wheels");
-  const [rareza, setRareza] = useState("Común");
+  const [rareza, setRareza] = useState("Básico / Común"); // Valor inicial por defecto
   const [anio, setAnio] = useState<string>("");
   const [estado, setEstado] = useState("Blíster Excelente Condición");
   
   const [valorCalculado, setValorCalculado] = useState(0);
   const [animando, setAnimando] = useState(false);
+
+  // 🔄 EFECTO EN CASCADA: Cuando cambia el fabricante, actualizamos la rareza
+  const manejarCambioFabricante = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nuevoFabricante = e.target.value;
+    setFabricante(nuevoFabricante);
+    
+    // Reseteamos la rareza a la primera opción disponible del nuevo fabricante
+    // para evitar que se quede guardada una rareza incompatible (Ej. STH en M2)
+    const opcionesDisponibles = mapaRarezas[nuevoFabricante];
+    if (opcionesDisponibles && opcionesDisponibles.length > 0) {
+      setRareza(opcionesDisponibles[0]);
+    }
+  };
 
   useEffect(() => {
     // Efecto visual de cálculo
@@ -59,37 +152,19 @@ export default function CalculadoraPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-cyan-600 font-bold uppercase tracking-wider mb-2 block">Fabricante</label>
-                  <select value={fabricante} onChange={(e) => setFabricante(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:border-cyan-500 cursor-pointer appearance-none">
-                    <option value="Hot Wheels">Hot Wheels</option>
-                    <option value="Matchbox">Matchbox</option>
-                    <option value="Majorette">Majorette</option>
-                    <option value="Maisto">Maisto / Bburago</option>
-                    <option value="Jada">Jada Toys</option>
-                    <option value="Greenlight">Greenlight</option>
-                    <option value="M2">M2 Machines</option>
-                    <option value="Mini GT">Mini GT</option>
-                    <option value="Inno64">Inno64 / Tarmac</option>
-                    <option value="Kaido House">Kaido House</option>
-                    <option value="Pop Race">Pop Race</option>
-                    <option value="Tomica">Tomica / TLV</option>
-                    <option value="Kyosho">Kyosho</option>
-                    <option value="AutoArt">AutoArt</option>
-                    <option value="PGM">PGM</option>
+                  <select value={fabricante} onChange={manejarCambioFabricante} className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:border-cyan-500 cursor-pointer appearance-none">
+                    {Object.keys(mapaRarezas).map((fab) => (
+                      <option key={fab} value={fab}>{fab}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-cyan-600 font-bold uppercase tracking-wider mb-2 block">Rareza / Variante</label>
                   <select value={rareza} onChange={(e) => setRareza(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:border-cyan-500 cursor-pointer appearance-none">
-                    <option value="Común">Básico / Común</option>
-                    <option value="Premium">Premium (Goma/Metal)</option>
-                    <option value="Treasure Hunt (TH)">Treasure Hunt (TH)</option>
-                    <option value="Super Treasure Hunt (STH)">Súper Treasure Hunt (STH)</option>
-                    <option value="RLC">RLC / Convención / Elite</option>
-                    <option value="Chase">Chase (M2, Mini GT, Matchbox)</option>
-                    <option value="Super Chase">Super Chase / Raw Metal</option>
-                    <option value="Green Machine">Green Machine (Greenlight)</option>
-                    <option value="White Lightning">White Lightning / Ultra Red</option>
-                    <option value="Zamac">Zamac / Variante de Tienda</option>
+                    {/* Aquí renderizamos dinámicamente las opciones del fabricante actual */}
+                    {mapaRarezas[fabricante]?.map((opcion) => (
+                      <option key={opcion} value={opcion}>{opcion}</option>
+                    ))}
                   </select>
                 </div>
               </div>
