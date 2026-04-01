@@ -1,9 +1,50 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
+import { Metadata } from 'next'; // 🧠 IMPORTACIÓN PARA EL SEO
 import BotonReportar from '@/components/BotonReportar';
+import BotonCompartir from '@/components/BotonCompartir'; // 🧠 IMPORTACIÓN DEL BOTÓN DE COMPARTIR
 
 export const revalidate = 60; 
+
+// =========================================================================
+// 🚀 MAGIA SEO: ESTO GENERA LA VISTA PREVIA EN WHATSAPP Y FACEBOOK
+// =========================================================================
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const resolvedParams = await params;
+  const idCarro = resolvedParams.id;
+  
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get() { return ''; } } });
+  
+  const { data: carro } = await supabase.from('carro').select('modelo, marca(marca), valor, imagen_url, usuario:id_usuario(nombre_usuario)').eq('id_carro', idCarro).single();
+
+  if (!carro) return { title: 'Pieza no encontrada - Collectors' };
+
+  // 🧠 FIX TYPESCRIPT: Le decimos a TS que confíe en la estructura
+  const carroData = carro as any;
+
+  const titulo = `${carroData.modelo} (${carroData.marca?.marca || 'Custom'}) | Collectors`;
+  const descripcion = `Mira esta increíble pieza en la bóveda de @${carroData.usuario?.nombre_usuario || 'un coleccionista'}. Valuada en $${carroData.valor}. ¡Entra a Collectors para ver los detalles!`;
+  const urlImagen = carroData.imagen_url || 'https://collectors-app-ecru.vercel.app/favicon.ico'; 
+
+  return {
+    title: titulo,
+    description: descripcion,
+    openGraph: {
+      title: titulo,
+      description: descripcion,
+      images: [urlImagen],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: titulo,
+      description: descripcion,
+      images: [urlImagen],
+    }
+  };
+}
+// =========================================================================
 
 export default async function DetallePieza({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
@@ -45,9 +86,14 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
   const esMiPieza = session?.user?.email === carro.usuario?.correo;
   
   let miIdUsuario = null;
+  let miNombreUsuario = ""; // 🧠 NUEVO: Necesitamos saber quién soy para el "Gafete Virtual"
+
   if (session?.user?.email) {
-    const { data: miPerfil } = await supabase.from('usuario').select('id_usuario').eq('correo', session.user.email).single();
-    miIdUsuario = miPerfil?.id_usuario;
+    const { data: miPerfil } = await supabase.from('usuario').select('id_usuario, nombre_usuario').eq('correo', session.user.email).single();
+    if (miPerfil) {
+      miIdUsuario = miPerfil.id_usuario;
+      miNombreUsuario = miPerfil.nombre_usuario; 
+    }
   }
 
   // ALGORITMO DE AMIGOS MUTUOS 🤝 (Para intercambios)
@@ -64,24 +110,34 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
   const esVenta = carro.para_venta;
   const esCambio = carro.para_cambio;
 
+  // 🧠 EL GAFETE VIRTUAL: Inyectamos el @usuario si está logueado, o lo dejamos general si es visitante
+  const textoIdentificacion = miNombreUsuario ? ` Soy el usuario *@${miNombreUsuario}* de la plataforma y` : ``;
+  
   let mensajeWhatsApp = "";
   if (esVenta) {
-    mensajeWhatsApp = `¡Hola ${carro.usuario?.nombre_usuario}! 👋🏼 Vi tu *${carro.modelo}* en tu tienda en Collectors. Me interesa comprarlo por $${carro.valor}. ¿Sigue disponible?`;
+    mensajeWhatsApp = `¡Hola ${carro.usuario?.nombre_usuario}! 👋🏼 Vi tu *${carro.modelo}* en tu tienda en Collectors.${textoIdentificacion} me interesa comprarlo por $${carro.valor}. ¿Sigue disponible?`;
   } else {
-    mensajeWhatsApp = `¡Hola ${carro.usuario?.nombre_usuario}! 👋🏼 Vi tu *${carro.modelo}* en Collectors y me interesa hacer un intercambio.`;
+    mensajeWhatsApp = `¡Hola ${carro.usuario?.nombre_usuario}! 👋🏼 Vi tu *${carro.modelo}* en Collectors.${textoIdentificacion} me interesa hacer un intercambio.`;
   }
   
   const enlaceWhatsApp = carro.usuario?.whatsapp ? `https://wa.me/${carro.usuario.whatsapp}?text=${encodeURIComponent(mensajeWhatsApp)}` : null;
-  const enlaceFacebook = carro.usuario?.facebook ? carro.usuario.facebook : null;
+  const enlaceFacebook = carro.usuario?.facebook ? (carro.usuario.facebook.startsWith('http') ? carro.usuario.facebook : `https://${carro.usuario.facebook}`) : null;
+
+  // 🧠 DATOS PARA EL BOTÓN DE COMPARTIR
+  const urlCompartir = `https://collectors-app-ecru.vercel.app/pieza/${idCarro}`;
+  const textoCompartir = `¡Mira este ${carro.modelo} valuado en $${carro.valor} en Collectors!`;
 
   return (
     <main className="min-h-screen bg-slate-50 selection:bg-cyan-200 selection:text-cyan-900 pb-20 font-sans">
       
-      <div className="max-w-6xl mx-auto px-4 pt-6 md:pt-10">
+      <div className="max-w-6xl mx-auto px-4 pt-6 md:pt-10 flex justify-between items-center flex-wrap gap-4">
         <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="inline-flex items-center gap-2 text-slate-500 hover:text-cyan-600 transition-colors font-bold text-sm bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
           Volver al Perfil
         </Link>
+
+        {/* 🚀 BOTÓN DE COMPARTIR INYECTADO AQUÍ */}
+        <BotonCompartir titulo={carro.modelo} texto={textoCompartir} url={urlCompartir} />
       </div>
 
       <div className="max-w-6xl mx-auto px-4 mt-6 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
@@ -103,7 +159,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               <div className="bg-white/90 backdrop-blur-md border border-slate-200 text-slate-800 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-md">
                 {carro.rareza || 'ESTÁNDAR'}
               </div>
-              {/* 📦 ETIQUETA NUEVA DE PRESENTACIÓN SOBRE LA FOTO */}
+              {/* 📦 ETIQUETA DE PRESENTACIÓN */}
               {carro.presentacion?.presentacion && carro.presentacion.presentacion !== 'Individual Básico' && (
                 <div className="bg-indigo-900/80 backdrop-blur-md border border-indigo-500/50 text-indigo-100 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-1">
                   📦 {carro.presentacion.presentacion}
@@ -155,7 +211,6 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
           </h1>
           <p className="text-xl text-cyan-600 font-bold mb-8">{carro.marca?.marca || 'Marca Desconocida'} • {carro.fabricante?.fabricante || 'Sin Fabricante'}</p>
 
-          {/* 📦 CUADRÍCULA DE CARACTERÍSTICAS ACTUALIZADA */}
           <div className="grid grid-cols-2 gap-4 mb-8">
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
               <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Serie / Año</p>
@@ -174,7 +229,6 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               <p className="text-sm text-emerald-600 font-bold">{carro.estado_carro_rel?.estado_carro || 'No especificada'}</p>
             </div>
             
-            {/* 📦 NUEVO CUADRITO DE PRESENTACIÓN (Ocupa las 2 columnas si es necesario) */}
             <div className="col-span-2 bg-indigo-50 border border-indigo-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
               <div>
                 <p className="text-xs text-indigo-500 uppercase font-bold tracking-wider mb-1">Empaque Original</p>
@@ -213,14 +267,21 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
               <p className="text-amber-700 font-black uppercase tracking-wider text-xs mb-4">Adquirir esta pieza</p>
               
-              {enlaceWhatsApp ? (
-                <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer" className="w-full bg-amber-500 hover:bg-amber-400 text-white font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-amber-500/40 relative z-10">
-                  <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.305-.885-.653-1.48-1.459-1.653-1.756-.173-.298-.019-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 00-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-                  Comprar Directo
-                </a>
-              ) : (
-                <p className="text-xs text-amber-700 font-bold">Esta tienda no tiene número registrado.</p>
-              )}
+              <div className="flex flex-col gap-3 relative z-10">
+                {enlaceWhatsApp ? (
+                  <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer" className="w-full bg-amber-500 hover:bg-amber-400 text-white font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-amber-500/40">
+                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.305-.885-.653-1.48-1.459-1.653-1.756-.173-.298-.019-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 00-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                    Comprar Directo
+                  </a>
+                ) : enlaceFacebook ? (
+                  <a href={enlaceFacebook.startsWith('http') ? enlaceFacebook : `https://${enlaceFacebook}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#1877F2] hover:bg-[#155ebb] text-white font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg">
+                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                    Contactar por Facebook
+                  </a>
+                ) : (
+                  <p className="text-xs text-amber-700 font-bold">Esta tienda no tiene redes registradas.</p>
+                )}
+              </div>
             </div>
           ) : !esCambio ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">

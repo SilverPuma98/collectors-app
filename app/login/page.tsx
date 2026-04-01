@@ -82,6 +82,12 @@ export default function Login() {
               placeholder="••••••••"
               className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-cyan-500 transition-colors placeholder:text-slate-700"
             />
+            {/* 🚀 NUEVO: ENLACE PARA RECUPERAR CONTRASEÑA */}
+            <div className="flex justify-end mt-2">
+              <Link href="/recuperar" className="text-xs font-bold text-cyan-500 hover:text-cyan-400 transition-colors">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
           </div>
 
           <button

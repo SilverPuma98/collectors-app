@@ -6,6 +6,7 @@ import { Inter } from 'next/font/google';
 // Importamos tus nuevos componentes
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import BannerCookies from "@/components/BannerCookies"; // 🧠 1. IMPORTAMOS EL BANNER DE COOKIES
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -37,6 +38,9 @@ export default function RootLayout({
 
         {/* 3. El Footer Global */}
         <Footer />
+        
+        {/* 4. El Banner de Cookies (Flota sobre toda la app) */}
+        <BannerCookies />
         
       </body>
     </html>

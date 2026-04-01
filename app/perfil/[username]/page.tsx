@@ -7,6 +7,9 @@ import Link from 'next/link';
 // 🧠 INYECTAMOS EL MOTOR DE NIVELES
 import { calcularNivel } from '@/lib/levelEngine';
 
+// 🧠 IMPORTAMOS EL COMPONENTE DE RESEÑAS
+import SeccionResenas from '@/components/SeccionResenas'; 
+
 // 🧠 Importamos la misma librería de íconos que usamos en el Panel
 import { 
   FaCar, FaMoneyBillWave, FaTrophy, FaWrench, FaGlobe, FaStar, FaInfinity, 
@@ -110,16 +113,23 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
   // 🧠 CALCULAMOS EL NIVEL DEL USUARIO BASADO EN SUS LOGROS
   const infoNivel = calcularNivel(trofeos.length);
 
+  // 🧠 TRAEMOS LAS RESEÑAS PARA CALCULAR EL PROMEDIO EN LA CABECERA
+  const { data: reseñas } = await supabase.from('review_vendedor').select('calificacion').eq('id_vendedor', perfil.id_usuario);
+  const promedioEstrellas = reseñas && reseñas.length > 0 ? (reseñas.reduce((acc, curr) => acc + curr.calificacion, 0) / reseñas.length).toFixed(1) : "0.0";
+  const totalReseñas = reseñas ? reseñas.length : 0;
+
   // 4. Revisamos si el visitante tiene sesión y si ya sigue a este usuario
   const { data: { session } } = await supabase.auth.getSession();
   let miIdUsuario = null;
   let yaLoSigo = false;
   let sonMutuos = false;
+  let miNombreUsuario = "";
 
   if (session?.user?.email) {
-    const { data: miPerfil } = await supabase.from('usuario').select('id_usuario').eq('correo', session.user.email).single();
+    const { data: miPerfil } = await supabase.from('usuario').select('id_usuario, nombre_usuario').eq('correo', session.user.email).single();
     if (miPerfil) {
       miIdUsuario = miPerfil.id_usuario;
+      miNombreUsuario = miPerfil.nombre_usuario; // 🧠 GUARDAMOS MI NOMBRE PARA EL BOTÓN DE WHATSAPP
       
       const { data: follow } = await supabase.from('seguidor').select('*').eq('seguidor_id', miIdUsuario).eq('seguido_id', perfil.id_usuario).single();
       if (follow) yaLoSigo = true;
@@ -150,7 +160,9 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
   // Lógica de visualización de contacto
   const mostrarContacto = esVendedor || sonMutuos || esMio;
 
-  const enlaceWhatsApp = perfil.whatsapp ? `https://wa.me/${perfil.whatsapp}` : null;
+  // 🧠 MENSAJE DINÁMICO DE WHATSAPP CON EL @USUARIO
+  const mensajeWhatsApp = miNombreUsuario ? `Hola, vengo de Collectors. Soy el usuario @${miNombreUsuario} y me interesa hacer un trato contigo.` : `Hola, vengo de Collectors y me interesa hacer un trato contigo.`;
+  const enlaceWhatsApp = perfil.whatsapp ? `https://wa.me/${perfil.whatsapp}?text=${encodeURIComponent(mensajeWhatsApp)}` : null;
   const enlaceFacebook = perfil.facebook ? (perfil.facebook.startsWith('http') ? perfil.facebook : `https://${perfil.facebook}`) : null;
   const enlaceMaps = perfil.link_maps ? (perfil.link_maps.startsWith('http') ? perfil.link_maps : `https://${perfil.link_maps}`) : null;
 
@@ -198,6 +210,13 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               <span className="text-sm">{infoNivel.icon}</span>
               <span className="text-[10px] font-black tracking-widest uppercase">Nvl {infoNivel.nivel}: {infoNivel.titulo}</span>
             </div>
+
+            {/* 🧠 ESTRELLITAS DE REPUTACIÓN EN CABECERA */}
+            {esVendedor && (
+              <div className="flex items-center gap-1 text-amber-500 text-sm font-black -mt-2 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full shadow-sm">
+                <FaStar /> {promedioEstrellas} <span className="text-amber-700/60 text-[10px] ml-1">({totalReseñas})</span>
+              </div>
+            )}
           </div>
 
           {/* Info Principal */}
@@ -321,8 +340,8 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
             {carros.map((carro) => (
               <Link key={carro.id_carro} href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200 relative group">
-                {carro.para_venta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-md">💲 VENTA</div>}
-                {!carro.para_venta && carro.para_cambio && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-md">CAMBIO</div>}
+                {carro.para_venta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">💲 VENTA</div>}
+                {!carro.para_venta && carro.para_cambio && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">CAMBIO</div>}
                 
                 <CollectorCard 
                   modelo={carro.modelo} 
@@ -337,6 +356,16 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
             ))}
           </div>
         )}
+        
+        {/* 🧠 AQUÍ INSERTAMOS EL COMPONENTE DE REPUTACIÓN (Solo visible si es Vendedor) */}
+        {esVendedor && (
+          <SeccionResenas 
+            idVendedor={perfil.id_usuario} 
+            miIdUsuario={miIdUsuario} 
+            esVendedor={esMio} 
+          />
+        )}
+
       </div>
 
     </main>
