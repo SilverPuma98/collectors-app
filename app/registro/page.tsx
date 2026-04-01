@@ -15,6 +15,7 @@ export default function RegistroPage() {
   
   const [mensaje, setMensaje] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [registroExitoso, setRegistroExitoso] = useState(false); // 📬 NUEVO ESTADO PARA PANTALLA DE ÉXITO
 
   const handleRegistro = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,18 +54,49 @@ export default function RegistroPage() {
 
     if (dbError) {
       setMensaje("❌ Error al crear perfil: " + dbError.message);
+      setCargando(false);
     } else {
-      setMensaje("✅ ¡Cuenta creada con éxito! Abriendo la bóveda...");
-      // Lo mandamos directo a su nuevo PANEL (Ya no existe mi-garaje)
-      setTimeout(() => {
-        router.push("/mi-panel");
-        router.refresh();
-      }, 2000);
+      // 📬 MOSTRAR PANTALLA DE CONFIRMACIÓN DE CORREO
+      setRegistroExitoso(true);
     }
-    
-    setCargando(false);
   };
 
+  // 📬 SI EL REGISTRO FUE EXITOSO, MOSTRAMOS LA PANTALLA DE VERIFICACIÓN
+  if (registroExitoso) {
+    return (
+      <main className="min-h-screen bg-[#050810] flex flex-col items-center justify-center p-4 selection:bg-cyan-900 selection:text-cyan-50 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-96 h-96 bg-cyan-900/10 rounded-full blur-3xl -translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-emerald-900/10 rounded-full blur-3xl translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+
+        <div className="bg-[#0b1120] border border-cyan-900/50 p-8 md:p-12 rounded-3xl shadow-2xl max-w-lg w-full z-10 text-center animate-in fade-in zoom-in duration-500">
+          <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+            <svg className="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+          </div>
+          
+          <h1 className="text-3xl font-black text-white mb-4">¡Revisa tu Correo!</h1>
+          
+          <p className="text-slate-400 mb-6 leading-relaxed">
+            Hemos enviado un enlace mágico a <span className="font-bold text-cyan-400">{email}</span>. 
+            Debes hacer clic en él para verificar tu cuenta y poder acceder a tu bóveda.
+          </p>
+
+          <div className="bg-amber-900/20 border border-amber-900/50 rounded-xl p-4 mb-8 text-left">
+            <p className="text-sm font-bold text-amber-500 flex items-center gap-2 mb-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              Nota Importante
+            </p>
+            <p className="text-xs text-amber-600/80">Si no ves el correo en tu bandeja principal, revisa tu carpeta de <strong>Spam o Correo no deseado</strong>.</p>
+          </div>
+
+          <Link href="/login" className="inline-block w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 rounded-xl transition-all shadow-md">
+            Ir a Iniciar Sesión
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  // PANTALLA NORMAL DE REGISTRO
   return (
     <main className="min-h-screen bg-[#050810] flex flex-col items-center justify-center p-4 selection:bg-cyan-900 selection:text-cyan-50 relative overflow-hidden">
       
@@ -86,7 +118,7 @@ export default function RegistroPage() {
         <form onSubmit={handleRegistro} className="flex flex-col gap-5">
           
           {mensaje && (
-            <div className={`text-sm font-bold p-3 rounded-xl text-center animate-in fade-in zoom-in duration-300 ${mensaje.includes('❌') ? 'text-red-400 bg-red-500/10 border border-red-500/30' : 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30'}`}>
+            <div className={`text-sm font-bold p-3 rounded-xl text-center animate-in fade-in zoom-in duration-300 ${mensaje.includes('❌') ? 'text-red-400 bg-red-500/10 border border-red-500/30' : 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/30'}`}>
               {mensaje}
             </div>
           )}

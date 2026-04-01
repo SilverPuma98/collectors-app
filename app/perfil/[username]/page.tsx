@@ -4,6 +4,9 @@ import { cookies } from 'next/headers';
 import CollectorCard from '@/components/CollectorCard';
 import Link from 'next/link';
 
+// 🧠 INYECTAMOS EL MOTOR DE NIVELES
+import { calcularNivel } from '@/lib/levelEngine';
+
 // 🧠 Importamos la misma librería de íconos que usamos en el Panel
 import { 
   FaCar, FaMoneyBillWave, FaTrophy, FaWrench, FaGlobe, FaStar, FaInfinity, 
@@ -20,7 +23,6 @@ export const revalidate = 60;
 const getIconForAchievement = (logro: any) => {
   const code = logro.codigo_regla || '';
 
-  // 🧠 SOLUCIÓN: Cambiamos JSX.Element por React.ReactNode
   const iconMap: Record<string, React.ReactNode> = {
     'CREADOR_SUPREMO': <FaInfinity className="w-5 h-5" />,
     'CAZADOR_NOCTURNO': <FaGhost className="w-5 h-5" />,
@@ -89,10 +91,10 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
     );
   }
 
-  // 2. Buscamos sus autos públicos
+  // 2. Buscamos sus autos públicos (📦 AHORA INCLUYE LA PRESENTACIÓN)
   const { data: carros } = await supabase
     .from('carro')
-    .select('*, marca(marca)')
+    .select('*, marca(marca), presentacion(presentacion)')
     .eq('id_usuario', perfil.id_usuario)
     .eq('estado_aprobacion', 'APROBADO')
     .order('id_carro', { ascending: false });
@@ -104,6 +106,9 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
     .eq('id_usuario', perfil.id_usuario);
   
   const trofeos = logrosData?.map(l => l.logro) || [];
+
+  // 🧠 CALCULAMOS EL NIVEL DEL USUARIO BASADO EN SUS LOGROS
+  const infoNivel = calcularNivel(trofeos.length);
 
   // 4. Revisamos si el visitante tiene sesión y si ya sigue a este usuario
   const { data: { session } } = await supabase.auth.getSession();
@@ -173,18 +178,26 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
       <div className="bg-white border-b border-slate-200 pt-10 pb-8 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10">
           
-          {/* Avatar */}
-          <div className={`relative w-32 h-32 md:w-40 md:h-40 rounded-full border-4 shadow-xl flex-shrink-0 bg-slate-200 overflow-hidden ${esVendedor ? 'border-amber-400' : 'border-white'}`}>
-            {perfil.link_img_perf ? (
-              <img src={perfil.link_img_perf} alt={perfil.nombre_usuario} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-400">
-                <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-              </div>
-            )}
-            {esVendedor && (
-              <div className="absolute bottom-0 w-full bg-amber-500 text-white text-[10px] font-black text-center py-1">TIENDA PRO</div>
-            )}
+          {/* Avatar y Nivel */}
+          <div className="flex flex-col items-center gap-4">
+            <div className={`relative w-32 h-32 md:w-40 md:h-40 rounded-full border-4 shadow-xl flex-shrink-0 bg-slate-200 overflow-hidden ${esVendedor ? 'border-amber-400' : 'border-white'}`}>
+              {perfil.link_img_perf ? (
+                <img src={perfil.link_img_perf} alt={perfil.nombre_usuario} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                  <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                </div>
+              )}
+              {esVendedor && (
+                <div className="absolute bottom-0 w-full bg-amber-500 text-white text-[10px] font-black text-center py-1">TIENDA PRO</div>
+              )}
+            </div>
+
+            {/* 🧠 INSIGNIA DE NIVEL DINÁMICA */}
+            <div className={`inline-flex items-center justify-center gap-1.5 ${infoNivel.bg} ${infoNivel.text} px-4 py-1.5 rounded-full border ${infoNivel.border} ${infoNivel.shadow} shadow-lg w-fit -mt-2 z-10`}>
+              <span className="text-sm">{infoNivel.icon}</span>
+              <span className="text-[10px] font-black tracking-widest uppercase">Nvl {infoNivel.nivel}: {infoNivel.titulo}</span>
+            </div>
           </div>
 
           {/* Info Principal */}
@@ -210,12 +223,11 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               </div>
             </div>
 
-            {/* 🧠 ACTUALIZADO: MINI LOGROS (Ahora con SVG Dinámicos en lugar de imágenes de enlace) */}
+            {/* 🧠 ACTUALIZADO: MINI LOGROS */}
             {trofeos.length > 0 && (
               <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-4">
                 {trofeos.map((t: any) => (
                   <div key={t.id_logro} className={`w-9 h-9 rounded-full border-2 flex items-center justify-center p-1.5 relative group cursor-help transition-transform hover:scale-110 shadow-sm ${getMiniRarezaColor(t.rareza_logro)}`}>
-                    {/* Renderizamos el ícono vectorial en chiquito */}
                     {getIconForAchievement(t)}
                     
                     {/* Tooltip */}
@@ -312,7 +324,15 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
                 {carro.para_venta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-md">💲 VENTA</div>}
                 {!carro.para_venta && carro.para_cambio && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-md">CAMBIO</div>}
                 
-                <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Desconocida"} rareza={carro.rareza || "Estándar"} valor={carro.valor} valorCalculado={carro.valor_calculado} imagenUrl={carro.imagen_url} />
+                <CollectorCard 
+                  modelo={carro.modelo} 
+                  marca={carro.marca?.marca || "Desconocida"} 
+                  rareza={carro.rareza || "Estándar"} 
+                  presentacion={carro.presentacion?.presentacion} 
+                  valor={carro.valor} 
+                  valorCalculado={carro.valor_calculado} 
+                  imagenUrl={carro.imagen_url} 
+                />
               </Link>
             ))}
           </div>

@@ -31,7 +31,7 @@ export function calcularValorAproximado(
   else if (fab.includes('m2')) { P_retail = 280; B = 1.2; } 
   else if (fab.includes('mini gt') || fab.includes('minigt')) { P_retail = 420; B = 1.4; } 
   else if (fab.includes('inno64') || fab.includes('tarmac')) { P_retail = 550; B = 1.5; } 
-  else if (fab.includes('kaido')) { P_retail = 580; B = 1.7; } 
+  else if (fab.includes('kaido')) { P_retail = 400; B = 1.7; } 
   else if (fab.includes('pop race')) { P_retail = 480; B = 1.4; } 
   else if (fab.includes('tomica')) { P_retail = 450; B = 1.3; } 
   else if (fab.includes('kyosho')) { P_retail = 500; B = 1.5; } 

@@ -17,11 +17,12 @@ export default function AdminDashboard() {
   const [fabricantes, setFabricantes] = useState<any[]>([]);
   const [series, setSeries] = useState<any[]>([]);
   const [rarezas, setRarezas] = useState<any[]>([]);
-  const [presentaciones, setPresentaciones] = useState<any[]>([]); // 📦 NUEVO ESTADO: Presentaciones
+  const [presentaciones, setPresentaciones] = useState<any[]>([]); 
   const [escalas, setEscalas] = useState<any[]>([]);
   const [estadosCarro, setEstadosCarro] = useState<any[]>([]);
   const [usuarios, setUsuarios] = useState<any[]>([]); 
   const [coches, setCoches] = useState<any[]>([]);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]); // 📬 NUEVO ESTADO: BUZÓN
 
   // ESTADOS DE UI
   const [modalAbierto, setModalAbierto] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export default function AdminDashboard() {
   const [nuevoFabricante, setNuevoFabricante] = useState("");
   const [nuevaSerie, setNuevaSerie] = useState({ serie: "", anio: "", no_carros: "", id_fabricante: "" });
   const [nuevaRareza, setNuevaRareza] = useState({ rareza: "", id_fabricante: "" });
-  const [nuevaPresentacion, setNuevaPresentacion] = useState({ presentacion: "", id_fabricante: "" }); // 📦 NUEVO FORMULARIO: Presentaciones
+  const [nuevaPresentacion, setNuevaPresentacion] = useState({ presentacion: "", id_fabricante: "" });
   const [nuevaEscala, setNuevaEscala] = useState("");
   const [nuevoEstadoCarro, setNuevoEstadoCarro] = useState("");
 
@@ -58,7 +59,6 @@ export default function AdminDashboard() {
   };
 
   const cargarTodosLosDatos = async (rol: string) => {
-    // 📦 AGREGAMOS LA CONSULTA DE PRESENTACIONES
     const [resMar, resFab, resSer, resRar, resPres, resEsc, resEst, resCoc] = await Promise.all([
       supabase.from('marca').select('*').order('id_marca', { ascending: true }),
       supabase.from('fabricante').select('*').order('id_fabricante', { ascending: true }),
@@ -74,7 +74,7 @@ export default function AdminDashboard() {
     if (resFab.data) setFabricantes(resFab.data);
     if (resSer.data) setSeries(resSer.data);
     if (resRar.data) setRarezas(resRar.data);
-    if (resPres.data) setPresentaciones(resPres.data); // 📦 GUARDAMOS PRESENTACIONES
+    if (resPres.data) setPresentaciones(resPres.data);
     if (resEsc.data) setEscalas(resEsc.data);
     if (resEst.data) setEstadosCarro(resEst.data);
     if (resCoc.data) setCoches(resCoc.data);
@@ -82,6 +82,10 @@ export default function AdminDashboard() {
     if (rol === 'SUPER_ADMIN') {
       const resUsu = await supabase.from('usuario').select('*').order('id_usuario', { ascending: true });
       if (resUsu.data) setUsuarios(resUsu.data);
+
+      // 📬 CARGAR BUZÓN SOLO PARA SÚPER ADMIN
+      const resFeed = await supabase.from('feedback').select('*, usuario(nombre_usuario, correo)').order('created_at', { ascending: false });
+      if (resFeed.data) setFeedbacks(resFeed.data);
     }
   };
 
@@ -90,18 +94,19 @@ export default function AdminDashboard() {
   const fabricantesFiltrados = fabricantes.filter(f => f.fabricante.toLowerCase().includes(busqueda.toLowerCase()));
   const seriesFiltradas = series.filter(s => s.serie.toLowerCase().includes(busqueda.toLowerCase()));
   const rarezasFiltradas = rarezas.filter(r => r.rareza.toLowerCase().includes(busqueda.toLowerCase()));
-  const presentacionesFiltradas = presentaciones.filter(p => p.presentacion.toLowerCase().includes(busqueda.toLowerCase())); // 📦 FILTRO PRESENTACIONES
+  const presentacionesFiltradas = presentaciones.filter(p => p.presentacion.toLowerCase().includes(busqueda.toLowerCase())); 
   const escalasFiltradas = escalas.filter(e => e.escala.toLowerCase().includes(busqueda.toLowerCase()));
   const estadosFiltrados = estadosCarro.filter(e => e.estado_carro.toLowerCase().includes(busqueda.toLowerCase()));
   const cochesFiltrados = coches.filter(c => c.modelo.toLowerCase().includes(busqueda.toLowerCase()));
   const usuariosFiltrados = usuarios.filter(u => (u.nombre_usuario?.toLowerCase() || "").includes(busqueda.toLowerCase()) || (u.correo?.toLowerCase() || "").includes(busqueda.toLowerCase()));
+  const feedbacksFiltrados = feedbacks.filter(f => f.mensaje.toLowerCase().includes(busqueda.toLowerCase()) || f.usuario?.nombre_usuario?.toLowerCase().includes(busqueda.toLowerCase()));
 
   const abrirModalCrear = (tipo: string) => {
     setItemEditando(null); 
     setNuevaMarca(""); setNuevoFabricante(""); setNuevaEscala(""); setNuevoEstadoCarro("");
     setNuevaSerie({ serie: "", anio: "", no_carros: "", id_fabricante: "" }); 
     setNuevaRareza({ rareza: "", id_fabricante: "" });
-    setNuevaPresentacion({ presentacion: "", id_fabricante: "" }); // 📦 RESET PRESENTACIONES
+    setNuevaPresentacion({ presentacion: "", id_fabricante: "" }); 
     setModalAbierto(tipo);
   };
 
@@ -111,14 +116,14 @@ export default function AdminDashboard() {
     if (tipo === "fabricante") setNuevoFabricante(item.fabricante);
     if (tipo === "serie") setNuevaSerie({ serie: item.serie, anio: item.anio || "", no_carros: item.no_carros || "", id_fabricante: item.id_fabricante });
     if (tipo === "rareza") setNuevaRareza({ rareza: item.rareza, id_fabricante: item.id_fabricante });
-    if (tipo === "presentacion") setNuevaPresentacion({ presentacion: item.presentacion, id_fabricante: item.id_fabricante }); // 📦 CARGAR PRESENTACIONES
+    if (tipo === "presentacion") setNuevaPresentacion({ presentacion: item.presentacion, id_fabricante: item.id_fabricante }); 
     if (tipo === "escala") setNuevaEscala(item.escala);
     if (tipo === "estado") setNuevoEstadoCarro(item.estado_carro);
     setModalAbierto(tipo);
   };
 
   // ==========================================
-  // FUNCIONES DE GUARDADO (CRUD) - A PRUEBA DE FALLOS
+  // FUNCIONES DE GUARDADO (CRUD)
   // ==========================================
   const guardarMarca = async (e: React.FormEvent) => { 
     e.preventDefault(); setCargando(true); 
@@ -146,7 +151,6 @@ export default function AdminDashboard() {
     if (error) alert("Error al guardar: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); 
   };
 
-  // 📦 NUEVA FUNCIÓN: GUARDAR PRESENTACIÓN
   const guardarPresentacion = async (e: React.FormEvent) => { 
     e.preventDefault(); setCargando(true); 
     const payload = { presentacion: nuevaPresentacion.presentacion, id_fabricante: parseInt(nuevaPresentacion.id_fabricante) }; 
@@ -192,6 +196,13 @@ export default function AdminDashboard() {
     if (error) alert("Error al rechazar: " + error.message); else cargarTodosLosDatos(miRol);
   };
 
+  // 📬 MARCAR FEEDBACK COMO RESUELTO
+  const resolverFeedback = async (id_feedback: number, estadoActual: string) => {
+    const nuevoEstado = estadoActual === 'PENDIENTE' ? 'RESUELTO' : 'PENDIENTE';
+    const { error } = await supabase.from('feedback').update({ estado: nuevoEstado }).eq('id_feedback', id_feedback);
+    if (error) alert("Error al actualizar: " + error.message); else cargarTodosLosDatos(miRol);
+  };
+
   if (!autorizado) return <div className="flex h-screen items-center justify-center text-cyan-500 animate-pulse font-bold">VERIFICANDO NIVEL DE ACCESO...</div>;
 
   return (
@@ -211,10 +222,7 @@ export default function AdminDashboard() {
           <button onClick={() => setTabActiva("fabricantes")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "fabricantes" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Fabricantes</button>
           <button onClick={() => setTabActiva("series")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "series" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Series</button>
           <button onClick={() => setTabActiva("rarezas")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "rarezas" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Rarezas</button>
-          
-          {/* 📦 NUEVO BOTÓN: PRESENTACIONES EN EL MENÚ LATERAL */}
           <button onClick={() => setTabActiva("presentaciones")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "presentaciones" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Presentaciones</button>
-          
           <button onClick={() => setTabActiva("escalas")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "escalas" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Escalas</button>
           <button onClick={() => setTabActiva("estados")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors ${tabActiva === "estados" ? "bg-slate-800 border border-cyan-900 text-cyan-400" : "text-slate-400 hover:bg-slate-800/30"}`}>Est. Autos</button>
           
@@ -228,10 +236,20 @@ export default function AdminDashboard() {
           </button>
 
           {miRol === 'SUPER_ADMIN' && (
-            <button onClick={() => setTabActiva("usuarios")} className={`whitespace-nowrap lg:mt-2 text-left px-4 py-3 rounded-lg font-medium transition-colors flex justify-between items-center ${tabActiva === "usuarios" ? "bg-emerald-900/40 border border-emerald-900 text-emerald-400" : "text-slate-400 hover:bg-slate-800/30"}`}>
-              <span>Usuarios</span>
-              <span className="bg-slate-800 text-xs px-2 py-1 rounded-full ml-2">{usuarios.length}</span>
-            </button>
+            <>
+              <button onClick={() => setTabActiva("usuarios")} className={`whitespace-nowrap lg:mt-2 text-left px-4 py-3 rounded-lg font-medium transition-colors flex justify-between items-center ${tabActiva === "usuarios" ? "bg-emerald-900/40 border border-emerald-900 text-emerald-400" : "text-slate-400 hover:bg-slate-800/30"}`}>
+                <span>Usuarios</span>
+                <span className="bg-slate-800 text-xs px-2 py-1 rounded-full ml-2">{usuarios.length}</span>
+              </button>
+
+              {/* 📬 BOTÓN DE BUZÓN */}
+              <button onClick={() => setTabActiva("buzon")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors flex justify-between items-center ${tabActiva === "buzon" ? "bg-indigo-900/40 border border-indigo-900 text-indigo-400" : "text-slate-400 hover:bg-slate-800/30"}`}>
+                <span>Buzón / Bugs</span>
+                {feedbacks.filter(f => f.estado === 'PENDIENTE').length > 0 && (
+                  <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full ml-2">{feedbacks.filter(f => f.estado === 'PENDIENTE').length}</span>
+                )}
+              </button>
+            </>
           )}
         </aside>
 
@@ -240,7 +258,7 @@ export default function AdminDashboard() {
           <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
             <input type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full md:w-1/2 bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-2 focus:border-cyan-500 outline-none" />
             
-            {(tabActiva !== "usuarios" && tabActiva !== "coches") && (
+            {(tabActiva !== "usuarios" && tabActiva !== "coches" && tabActiva !== "buzon") && (
               <button onClick={() => abrirModalCrear(tabActiva === 'estados' ? 'estado' : tabActiva === 'presentaciones' ? 'presentacion' : tabActiva.slice(0, -1))} className="w-full md:w-auto bg-cyan-700 hover:bg-cyan-600 text-white px-4 py-2 rounded-md font-bold">
                 + Nuevo Registro
               </button>
@@ -261,6 +279,7 @@ export default function AdminDashboard() {
                   {tabActiva === "presentaciones" && <><th className="pb-3 font-medium">Presentación / Empaque</th><th className="pb-3 font-medium">Fabricante</th></>}
                   {tabActiva === "usuarios" && <><th className="pb-3 font-medium">Usuario / Correo</th><th className="pb-3 font-medium">Rol</th></>}
                   {tabActiva === "coches" && <><th className="pb-3 font-medium">Auto</th><th className="pb-3 font-medium">Estatus</th><th className="pb-3 font-medium text-center">Valor</th></>}
+                  {tabActiva === "buzon" && <><th className="pb-3 font-medium">Tipo</th><th className="pb-3 font-medium">Usuario</th><th className="pb-3 font-medium">Mensaje</th><th className="pb-3 font-medium text-center">Estado</th></>}
                   <th className="pb-3 text-right pr-2 font-medium">Acciones</th>
                 </tr>
               </thead>
@@ -354,15 +373,35 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
                 ))}
+
+                {/* 📬 RENDER DE LA TABLA DEL BUZÓN */}
+                {miRol === 'SUPER_ADMIN' && tabActiva === "buzon" && feedbacksFiltrados.map((f) => (
+                  <tr key={f.id_feedback} className={`border-b border-slate-800/50 hover:bg-slate-800/30 ${f.estado === 'PENDIENTE' ? 'bg-indigo-900/10' : 'opacity-60'}`}>
+                    <td className="py-4 pl-2 text-slate-500">#{f.id_feedback}</td>
+                    <td className="py-4">
+                      <span className={`text-[10px] font-black px-2 py-1 rounded uppercase ${f.tipo === 'BUG' ? 'bg-red-500/20 text-red-500' : f.tipo === 'IDEA' ? 'bg-amber-500/20 text-amber-500' : 'bg-cyan-500/20 text-cyan-500'}`}>
+                        {f.tipo}
+                      </span>
+                    </td>
+                    <td className="py-4 font-bold text-slate-300">{f.usuario?.nombre_usuario || 'Anónimo'}</td>
+                    <td className="py-4 text-sm text-slate-400 max-w-xs truncate">{f.mensaje}</td>
+                    <td className="py-4 text-center">
+                      <button onClick={() => resolverFeedback(f.id_feedback, f.estado)} className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors ${f.estado === 'PENDIENTE' ? 'bg-slate-700 text-white hover:bg-emerald-600' : 'bg-emerald-500 text-white hover:bg-slate-600'}`}>
+                        {f.estado === 'PENDIENTE' ? 'Marcar Resuelto' : 'Resuelto ✓'}
+                      </button>
+                    </td>
+                    <td className="py-4 text-right pr-2">
+                      <button onClick={() => eliminarRegistro('feedback', 'id_feedback', f.id_feedback)} className="text-red-500 font-bold p-2 hover:bg-red-500/10 rounded">Borrar</button>
+                    </td>
+                  </tr>
+                ))}
+
               </tbody>
             </table>
           </div>
         </main>
       </div>
 
-      {/* =========================================================================
-          MODALES DE EDICIÓN Y CREACIÓN
-          ========================================================================= */}
       {modalAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl w-full max-w-sm">

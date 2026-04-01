@@ -129,6 +129,11 @@ export default function MiPanelUsuario() {
   const [escalas, setEscalas] = useState<any[]>([]);
   const [estadosCarro, setEstadosCarro] = useState<any[]>([]);
   const [busqueda, setBusqueda] = useState(""); 
+  const [tarjetaActiva, setTarjetaActiva] = useState<number | null>(null);
+  
+  const [tipoFeedback, setTipoFeedback] = useState("IDEA");
+  const [mensajeFeedback, setMensajeFeedback] = useState("");
+  const [enviandoFeedback, setEnviandoFeedback] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [guardandoCarro, setGuardandoCarro] = useState(false);
@@ -138,7 +143,6 @@ export default function MiPanelUsuario() {
   const [nuevosLogros, setNuevosLogros] = useState<string[]>([]);
   const [misTrofeos, setMisTrofeos] = useState<any[]>([]);
 
-  // 📦 Añadimos `otra_presentacion` para capturar el texto si el usuario crea una nueva
   const [nuevoCarro, setNuevoCarro] = useState({
     modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "",
     id_serie: "", otra_serie: "", rareza: "", id_presentacion: "", otra_presentacion: "", valor: "", id_escala: "", id_estado_carro: "", 
@@ -274,18 +278,12 @@ export default function MiPanelUsuario() {
   useEffect(() => {
     if (!cocheEditando && nuevoCarro.modelo && nuevoCarro.id_fabricante) {
       const timeout = setTimeout(() => {
-        // Convertimos IDs a Nombres reales para que la IA entienda
         const fab = fabricantes.find(f => f.id_fabricante.toString() === nuevoCarro.id_fabricante)?.fabricante || nuevoCarro.otro_fabricante;
         const est = estadosCarro.find(e => e.id_estado_carro.toString() === nuevoCarro.id_estado_carro)?.estado_carro || "";
         const anioNum = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
-        
-        // 🚨 AQUÍ ESTABA EL ERROR: Buscamos el NOMBRE de la rareza
         const nombreRar = rarezas.find(r => r.id_rareza.toString() === nuevoCarro.rareza)?.rareza || nuevoCarro.rareza;
-        
-        // Buscamos el NOMBRE de la presentación
         const nombrePres = presentaciones.find(p => p.id_presentacion.toString() === nuevoCarro.id_presentacion)?.presentacion || nuevoCarro.otra_presentacion || "Individual Básico";
 
-        // Enviamos NOMBRES, no IDs
         const valorSugerido = calcularValorAproximado(nuevoCarro.modelo, fab, nombreRar, nombrePres, anioNum, est);
         
         setNuevoCarro(prev => ({ ...prev, valor: valorSugerido.toString() }));
@@ -294,6 +292,7 @@ export default function MiPanelUsuario() {
       return () => clearTimeout(timeout);
     }
   }, [nuevoCarro.modelo, nuevoCarro.id_fabricante, nuevoCarro.otro_fabricante, nuevoCarro.rareza, nuevoCarro.id_presentacion, nuevoCarro.otra_presentacion, nuevoCarro.anio_serie, nuevoCarro.id_estado_carro, cocheEditando]);
+  
   useEffect(() => {
     if (nuevoCarro.id_serie && nuevoCarro.id_serie !== "nuevo") {
       const serieSeleccionada = series.find(s => s.id_serie === parseInt(nuevoCarro.id_serie));
@@ -321,7 +320,14 @@ export default function MiPanelUsuario() {
     const finalIdMar = await crearSiEsNuevo('marca', 'marca', nuevoCarro.id_marca, nuevoCarro.otra_marca);
     const finalIdSer = await crearSiEsNuevo('serie', 'serie', nuevoCarro.id_serie, nuevoCarro.otra_serie, { id_fabricante: finalIdFab, anio: parseInt(nuevoCarro.anio_serie) || null, no_carros: parseInt(nuevoCarro.total_carros) || null });
     
-    // 📦 CREAR PRESENTACIÓN SI ES NUEVA Y OBTENER SU ID
+    if (finalIdSer && nuevoCarro.id_serie !== "nuevo") {
+      await supabase.from('serie').update({
+        anio: parseInt(nuevoCarro.anio_serie) || null,
+        no_carros: parseInt(nuevoCarro.total_carros) || null,
+        id_fabricante: finalIdFab
+      }).eq('id_serie', finalIdSer);
+    }
+
     const finalIdPres = await crearSiEsNuevo('presentacion', 'presentacion', nuevoCarro.id_presentacion, nuevoCarro.otra_presentacion, { id_fabricante: finalIdFab });
 
     const finalAnio = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
@@ -335,7 +341,7 @@ export default function MiPanelUsuario() {
     const payload: any = {
       modelo: nuevoCarro.modelo, id_fabricante: finalIdFab, marca: finalIdMar, serie: finalIdSer,  
       rareza: nombreRareza, 
-      id_presentacion: finalIdPres || null, // 📦 GUARDAMOS EL ID FINAL
+      id_presentacion: finalIdPres || null, 
       valor: parseFloat(nuevoCarro.valor) || 0,
       valor_calculado: sugeridoIA,
       escala: parseInt(nuevoCarro.id_escala) || null, estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, no_carro: parseInt(nuevoCarro.no_carro) || null, 
@@ -427,6 +433,29 @@ export default function MiPanelUsuario() {
     setTabActiva("boveda"); 
   };
 
+  // 📬 NUEVA FUNCIÓN: ENVIAR FEEDBACK
+  const enviarFeedback = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mensajeFeedback.trim()) return;
+    setEnviandoFeedback(true);
+    
+    const payload = {
+      id_usuario: miPerfil.id_usuario,
+      tipo: tipoFeedback,
+      mensaje: mensajeFeedback
+    };
+
+    const { error } = await supabase.from('feedback').insert([payload]);
+    
+    if (error) {
+      alert("Error al enviar el reporte: " + error.message);
+    } else {
+      alert("✅ ¡Mensaje enviado al centro de mando! Gracias por tu aporte.");
+      setMensajeFeedback("");
+    }
+    setEnviandoFeedback(false);
+  };
+
   const abrirModalCarro = (carro: any = null) => {
     if (carro) {
       setCocheEditando(carro.id_carro);
@@ -445,7 +474,7 @@ export default function MiPanelUsuario() {
         otra_serie: "", 
         rareza: idRarezaReal.toString(), 
         id_presentacion: carro.id_presentacion ? carro.id_presentacion.toString() : "", 
-        otra_presentacion: "", // Limpiamos la captura manual
+        otra_presentacion: "", 
         valor: carro.valor ? carro.valor.toString() : "", 
         id_escala: carro.escala ? carro.escala.toString() : "", 
         id_estado_carro: carro.estado_carro ? carro.estado_carro.toString() : "", 
@@ -529,6 +558,12 @@ export default function MiPanelUsuario() {
               Subida Masiva (PRO)
             </button>
           )}
+
+          {/* 📬 NUEVO: BOTÓN DEL BUZÓN DE IDEAS */}
+          <button onClick={() => setTabActiva("feedback")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "feedback" ? "bg-indigo-50 border-2 border-indigo-500 shadow-md text-indigo-700" : "bg-transparent text-slate-500 hover:bg-indigo-50 hover:text-indigo-700"}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+            Soporte / Ideas
+          </button>
         </aside>
 
         {/* ÁREA PRINCIPAL */}
@@ -552,15 +587,20 @@ export default function MiPanelUsuario() {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
                   {carrosFiltrados.map((carro) => (
-                    <div key={carro.id_carro} className="relative group">
+                    <div 
+                      key={carro.id_carro} 
+                      className="relative group cursor-pointer"
+                      onClick={() => setTarjetaActiva(tarjetaActiva === carro.id_carro ? null : carro.id_carro)}
+                    >
                       {carro.estado_aprobacion === 'PENDIENTE' && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">REVISIÓN</div>}
                       {carro.para_cambio && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">CAMBIO</div>}
                       {carro.para_venta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">💲 EN VENTA</div>}
                       
-                      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl">
-                        <button onClick={() => abrirModalCarro(carro)} className="bg-white text-slate-800 px-4 py-2 rounded-lg shadow-lg font-bold text-xs w-28 hover:bg-slate-100">Editar</button>
-                        <button onClick={() => eliminarCarro(carro.id_carro)} className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg font-bold text-xs w-28 hover:bg-red-400">Eliminar</button>
-                        <Link href={`/pieza/${carro.id_carro}`} className="bg-cyan-600 text-white px-4 py-2 rounded-lg shadow-lg font-bold text-xs w-28 text-center hover:bg-cyan-500 mt-2">Detalles</Link>
+                      {/* 📱 OVERLAY HÍBRIDO (Hover en PC, Toque en Móvil) */}
+                      <div className={`absolute inset-0 bg-slate-900/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2 transition-opacity duration-300 rounded-2xl p-2 ${tarjetaActiva === carro.id_carro ? 'opacity-100' : 'opacity-0 lg:group-hover:opacity-100'}`}>
+                        <button onClick={(e) => { e.stopPropagation(); abrirModalCarro(carro); }} className="w-full max-w-[120px] bg-white text-slate-800 py-2 rounded-lg shadow-lg font-bold text-xs hover:bg-slate-200 transition-transform active:scale-95">Editar</button>
+                        <button onClick={(e) => { e.stopPropagation(); eliminarCarro(carro.id_carro); }} className="w-full max-w-[120px] bg-red-500 text-white py-2 rounded-lg shadow-lg font-bold text-xs hover:bg-red-400 transition-transform active:scale-95">Eliminar</button>
+                        <Link href={`/pieza/${carro.id_carro}`} onClick={(e) => e.stopPropagation()} className="w-full max-w-[120px] bg-cyan-600 text-white py-2 rounded-lg shadow-lg font-bold text-xs text-center hover:bg-cyan-500 mt-2 transition-transform active:scale-95">Detalles</Link>
                       </div>
                       
                       <CollectorCard 
@@ -692,6 +732,35 @@ export default function MiPanelUsuario() {
             </div>
           )}
 
+          {/* 📬 PANTALLA 5: FEEDBACK / BUZÓN */}
+          {tabActiva === "feedback" && (
+             <div className="max-w-2xl mx-auto animate-in fade-in duration-300">
+               <h2 className="text-2xl font-black text-slate-800 mb-2">Buzón de Sugerencias y Reportes</h2>
+               <p className="text-slate-500 text-sm mb-8">¿Encontraste un error? ¿Tienes una idea increíble para la plataforma? Escríbele directo a los desarrolladores.</p>
+               
+               <form onSubmit={enviarFeedback} className="flex flex-col gap-6 bg-indigo-50/50 p-6 md:p-8 rounded-3xl border border-indigo-100 shadow-inner">
+                 
+                 <div>
+                   <label className="text-xs text-indigo-800 font-bold uppercase tracking-wider mb-2 block">Tipo de Mensaje</label>
+                   <div className="grid grid-cols-3 gap-3">
+                     <button type="button" onClick={() => setTipoFeedback('IDEA')} className={`py-3 rounded-xl text-sm font-bold border transition-colors ${tipoFeedback === 'IDEA' ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}>💡 Idea</button>
+                     <button type="button" onClick={() => setTipoFeedback('BUG')} className={`py-3 rounded-xl text-sm font-bold border transition-colors ${tipoFeedback === 'BUG' ? 'bg-red-100 border-red-300 text-red-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}>🐛 Error/Bug</button>
+                     <button type="button" onClick={() => setTipoFeedback('OTRO')} className={`py-3 rounded-xl text-sm font-bold border transition-colors ${tipoFeedback === 'OTRO' ? 'bg-cyan-100 border-cyan-300 text-cyan-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}>💬 Otro</button>
+                   </div>
+                 </div>
+
+                 <div>
+                   <label className="text-xs text-indigo-800 font-bold uppercase tracking-wider mb-2 block">Tu Mensaje</label>
+                   <textarea required placeholder="Describe tu idea o el problema que encontraste..." value={mensajeFeedback} onChange={(e) => setMensajeFeedback(e.target.value)} rows={5} className="w-full bg-white border border-indigo-200 text-slate-800 rounded-2xl px-4 py-3 outline-none focus:border-indigo-500 transition-colors shadow-sm resize-none"></textarea>
+                 </div>
+
+                 <button type="submit" disabled={enviandoFeedback || !mensajeFeedback.trim()} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-xl shadow-lg transition-all text-lg mt-2 disabled:opacity-50">
+                   {enviandoFeedback ? "Enviando señal..." : "Enviar al Centro de Mando"}
+                 </button>
+               </form>
+             </div>
+          )}
+
         </main>
       </div>
 
@@ -746,17 +815,16 @@ export default function MiPanelUsuario() {
                   </div>
                 </div>
 
-                {/* 📦 NUEVA SECCIÓN: PRESENTACIÓN Y RAREZA JUNTAS (Mejor diseño) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="z-[33]">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block flex items-center gap-1">📦 Presentación / Empaque</label>
                     <BuscadorDesplegable 
                       opciones={opcionesPresentacion}
                       valorSeleccionado={nuevoCarro.id_presentacion}
-                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, id_presentacion: id, otra_presentacion: text})} // 📦 AGREGADA `otra_presentacion: text` PARA CREAR NUEVAS
+                      onSelect={(id, text) => setNuevoCarro({...nuevoCarro, id_presentacion: id, otra_presentacion: text})}
                       placeholder="Ej. 5-Pack, Individual..."
                       disabled={!idFabAct}
-                      permiteNuevo={true} // 📦 HABILITADO PARA TODOS LOS USUARIOS
+                      permiteNuevo={true}
                     />
                   </div>
                   <div className="z-[32]">
