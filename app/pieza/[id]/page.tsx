@@ -1,9 +1,10 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { Metadata } from 'next'; // 🧠 IMPORTACIÓN PARA EL SEO
+import { Metadata } from 'next'; 
 import BotonReportar from '@/components/BotonReportar';
-import BotonCompartir from '@/components/BotonCompartir'; // 🧠 IMPORTACIÓN DEL BOTÓN DE COMPARTIR
+import BotonCompartir from '@/components/BotonCompartir'; 
+import GaleriaImagenes from '@/components/GaleriaImagenes'; // 🧠 IMPORTAMOS LA NUEVA GALERÍA
 
 export const revalidate = 60; 
 
@@ -20,7 +21,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   if (!carro) return { title: 'Pieza no encontrada - Collectors' };
 
-  // 🧠 FIX TYPESCRIPT: Le decimos a TS que confíe en la estructura
   const carroData = carro as any;
 
   const titulo = `${carroData.modelo} (${carroData.marca?.marca || 'Custom'}) | Collectors`;
@@ -86,7 +86,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
   const esMiPieza = session?.user?.email === carro.usuario?.correo;
   
   let miIdUsuario = null;
-  let miNombreUsuario = ""; // 🧠 NUEVO: Necesitamos saber quién soy para el "Gafete Virtual"
+  let miNombreUsuario = ""; 
 
   if (session?.user?.email) {
     const { data: miPerfil } = await supabase.from('usuario').select('id_usuario, nombre_usuario').eq('correo', session.user.email).single();
@@ -106,16 +106,19 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
     if (yoSigo.data && meSigue.data) sonMutuos = true;
   }
 
-  // LÓGICA DE NEGOCIACIÓN (Venta vs Cambio)
+  // LÓGICA DE NEGOCIACIÓN
   const esVenta = carro.para_venta;
   const esCambio = carro.para_cambio;
 
-  // 🧠 EL GAFETE VIRTUAL: Inyectamos el @usuario si está logueado, o lo dejamos general si es visitante
   const textoIdentificacion = miNombreUsuario ? ` Soy el usuario *@${miNombreUsuario}* de la plataforma y` : ``;
   
   let mensajeWhatsApp = "";
   if (esVenta) {
-    mensajeWhatsApp = `¡Hola ${carro.usuario?.nombre_usuario}! 👋🏼 Vi tu *${carro.modelo}* en tu tienda en Collectors.${textoIdentificacion} me interesa comprarlo por $${carro.valor}. ¿Sigue disponible?`;
+    if (carro.es_preventa) {
+      mensajeWhatsApp = `¡Hola ${carro.usuario?.nombre_usuario}! 👋🏼 Vi tu preventa de *${carro.modelo}* en tu tienda en Collectors.${textoIdentificacion} me interesa apartarlo por $${carro.valor}. ¿Sigue disponible?`;
+    } else {
+      mensajeWhatsApp = `¡Hola ${carro.usuario?.nombre_usuario}! 👋🏼 Vi tu *${carro.modelo}* en tu tienda en Collectors.${textoIdentificacion} me interesa comprarlo por $${carro.valor}. ¿Sigue disponible?`;
+    }
   } else {
     mensajeWhatsApp = `¡Hola ${carro.usuario?.nombre_usuario}! 👋🏼 Vi tu *${carro.modelo}* en Collectors.${textoIdentificacion} me interesa hacer un intercambio.`;
   }
@@ -123,7 +126,6 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
   const enlaceWhatsApp = carro.usuario?.whatsapp ? `https://wa.me/${carro.usuario.whatsapp}?text=${encodeURIComponent(mensajeWhatsApp)}` : null;
   const enlaceFacebook = carro.usuario?.facebook ? (carro.usuario.facebook.startsWith('http') ? carro.usuario.facebook : `https://${carro.usuario.facebook}`) : null;
 
-  // 🧠 DATOS PARA EL BOTÓN DE COMPARTIR
   const urlCompartir = `https://collectors-app-ecru.vercel.app/pieza/${idCarro}`;
   const textoCompartir = `¡Mira este ${carro.modelo} valuado en $${carro.valor} en Collectors!`;
 
@@ -136,30 +138,25 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
           Volver al Perfil
         </Link>
 
-        {/* 🚀 BOTÓN DE COMPARTIR INYECTADO AQUÍ */}
         <BotonCompartir titulo={carro.modelo} texto={textoCompartir} url={urlCompartir} />
       </div>
 
       <div className="max-w-6xl mx-auto px-4 mt-6 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
         
-        {/* LADO IZQUIERDO: LA FOTO */}
+        {/* =========================================================
+            📸 LADO IZQUIERDO: GALERÍA INTERACTIVA (AHORA CON COMPONENTE)
+            ========================================================= */}
         <div className="lg:col-span-7 flex flex-col gap-4">
-          <div className="relative w-full h-[50vh] md:h-[75vh] bg-[#0b1120] rounded-3xl overflow-hidden shadow-2xl group flex items-center justify-center p-4 border border-slate-800">
-            {carro.imagen_url ? (
-              <img src={carro.imagen_url} alt={carro.modelo} className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105 drop-shadow-2xl" />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-slate-600">
-                <svg className="w-24 h-24 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                <p className="font-bold tracking-widest uppercase">Sin Fotografía</p>
-              </div>
-            )}
-            
+          <GaleriaImagenes 
+            imagenPrincipal={carro.imagen_url} 
+            galeria={carro.galeria} 
+            modelo={carro.modelo}
+          >
+            {/* Etiquetas Superiores Izquierdas */}
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-2 items-start">
-              {/* Etiqueta de Rareza */}
               <div className="bg-white/90 backdrop-blur-md border border-slate-200 text-slate-800 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-md">
                 {carro.rareza || 'ESTÁNDAR'}
               </div>
-              {/* 📦 ETIQUETA DE PRESENTACIÓN */}
               {carro.presentacion?.presentacion && carro.presentacion.presentacion !== 'Individual Básico' && (
                 <div className="bg-indigo-900/80 backdrop-blur-md border border-indigo-500/50 text-indigo-100 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-1">
                   📦 {carro.presentacion.presentacion}
@@ -167,18 +164,31 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               )}
             </div>
             
-            {/* Etiquetas Dinámicas (Venta / Cambio) */}
-            {esVenta ? (
-              <div className="absolute top-4 right-4 z-20 bg-amber-500/90 backdrop-blur-md border border-amber-400 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1">
-                💲 EN VENTA
-              </div>
-            ) : esCambio ? (
-              <div className="absolute top-4 right-4 z-20 bg-emerald-500/90 backdrop-blur-md border border-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                DISPONIBLE
-              </div>
-            ) : null}
-          </div>
+            {/* Etiquetas Dinámicas PRO Superiores Derechas */}
+            <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 items-end">
+              {carro.es_lote && (
+                <div className="bg-purple-600/90 backdrop-blur-md border border-purple-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1">
+                  📦 LOTE
+                </div>
+              )}
+              {esVenta && !carro.es_preventa && (
+                <div className="bg-amber-500/90 backdrop-blur-md border border-amber-400 text-slate-900 text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1">
+                  💲 EN VENTA
+                </div>
+              )}
+              {carro.es_preventa && (
+                <div className="bg-indigo-600/90 backdrop-blur-md border border-indigo-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md shadow-indigo-500/50 animate-pulse flex items-center gap-1">
+                  ⏳ PREVENTA
+                </div>
+              )}
+              {esCambio && !esVenta && (
+                <div className="bg-emerald-500/90 backdrop-blur-md border border-emerald-400 text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                  CAMBIO
+                </div>
+              )}
+            </div>
+          </GaleriaImagenes>
         </div>
 
         {/* LADO DERECHO: DETALLES */}
@@ -199,7 +209,6 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
             </div>
           </Link>
 
-          {/* BOTÓN DE REPORTAR */}
           <div className="flex justify-end mb-2">
             {miIdUsuario && !esMiPieza && (
               <BotonReportar idCarro={carro.id_carro} miIdUsuario={miIdUsuario} />
@@ -238,9 +247,18 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
-          {/* =======================================================
-              COMPARATIVA DE PRECIOS NEUTRA 
-              ======================================================= */}
+          {/* 🧠 CUADRO ESPECIAL DE PREVENTA */}
+          {carro.es_preventa && carro.fecha_llegada && (
+            <div className="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 shadow-sm mb-8 flex items-center gap-4 animate-in fade-in">
+              <div className="text-4xl">⏳</div>
+              <div>
+                <p className="text-xs text-indigo-600 uppercase font-black tracking-wider mb-1">Llegada Estimada (Preventa)</p>
+                <p className="text-xl text-indigo-900 font-black">{new Date(carro.fecha_llegada).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              </div>
+            </div>
+          )}
+
+          {/* COMPARATIVA DE PRECIOS */}
           <div className="grid grid-cols-2 gap-4 mb-10">
             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left">
               <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Precio del Dueño</p>
@@ -252,7 +270,15 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
                 Valuación IA 
                 <span className="text-[8px] bg-cyan-600 text-white px-1.5 py-0.5 rounded shadow-sm">BETA</span>
               </p>
-              <p className="text-3xl font-black text-cyan-800 relative z-10">${carro.valor_calculado ? carro.valor_calculado.toLocaleString() : '0'}</p>
+              {/* 🧠 SI ES LOTE, OCULTAMOS LA VALUACIÓN */}
+              {carro.es_lote ? (
+                <>
+                  <p className="text-2xl font-black text-cyan-800 relative z-10 opacity-50">N/A</p>
+                  <p className="text-[9px] text-cyan-600 font-bold mt-1 relative z-10">La IA no valúa lotes.</p>
+                </>
+              ) : (
+                <p className="text-3xl font-black text-cyan-800 relative z-10">${carro.valor_calculado ? carro.valor_calculado.toLocaleString() : '0'}</p>
+              )}
             </div>
           </div>
 
@@ -269,9 +295,9 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               
               <div className="flex flex-col gap-3 relative z-10">
                 {enlaceWhatsApp ? (
-                  <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer" className="w-full bg-amber-500 hover:bg-amber-400 text-white font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-amber-500/40">
+                  <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-amber-500/40">
                     <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.305-.885-.653-1.48-1.459-1.653-1.756-.173-.298-.019-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 00-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-                    Comprar Directo
+                    {carro.es_preventa ? "Apartar con el Vendedor" : "Comprar Directo"}
                   </a>
                 ) : enlaceFacebook ? (
                   <a href={enlaceFacebook.startsWith('http') ? enlaceFacebook : `https://${enlaceFacebook}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#1877F2] hover:bg-[#155ebb] text-white font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg">

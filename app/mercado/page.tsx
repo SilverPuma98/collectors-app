@@ -113,9 +113,17 @@ export default function MarketplacePage() {
               <div key={p.id_carro} className="flex flex-col h-full group hover:-translate-y-2 transition-transform duration-300">
                 <Link href={`/pieza/${p.id_carro}`} className="relative flex-1 block">
                   
-                  {/* Etiqueta Visual de Venta/Cambio */}
-                  {p.para_venta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">En Venta</div>}
-                  {!p.para_venta && p.para_cambio && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">Cambio</div>}
+                  {/* 📦 LADO IZQUIERDO: Lote / Cambio */}
+                  <div className="absolute top-2 left-2 z-20 flex flex-col gap-1 items-start">
+                    {p.es_lote && <span className="bg-purple-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">📦 Lote</span>}
+                    {p.para_cambio && <span className="bg-emerald-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">Cambio</span>}
+                  </div>
+
+                  {/* ⏳ LADO DERECHO: Venta / Preventa */}
+                  <div className="absolute top-2 right-2 z-20 flex flex-col gap-1 items-end">
+                    {p.para_venta && !p.es_preventa && <span className="bg-amber-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">En Venta</span>}
+                    {p.es_preventa && <span className="bg-indigo-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-md uppercase animate-pulse shadow-indigo-500/50">⏳ Preventa</span>}
+                  </div>
                   
                   <CollectorCard 
                     modelo={p.modelo} 
