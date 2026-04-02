@@ -131,12 +131,10 @@ export default function MiPanelUsuario() {
   const [busqueda, setBusqueda] = useState(""); 
   const [tarjetaActiva, setTarjetaActiva] = useState<number | null>(null);
   
-  // Estados para Sugerencias
   const [tipoFeedback, setTipoFeedback] = useState("IDEA");
   const [mensajeFeedback, setMensajeFeedback] = useState("");
   const [enviandoFeedback, setEnviandoFeedback] = useState(false);
 
-  // ESTADOS DEL RADAR DE CLIENTES (BURÓ)
   const [busquedaRadar, setBusquedaRadar] = useState("");
   const [cargandoRadar, setCargandoRadar] = useState(false);
   const [resultadoRadar, setResultadoRadar] = useState<any>(null);
@@ -149,23 +147,23 @@ export default function MiPanelUsuario() {
   const [guardandoCarro, setGuardandoCarro] = useState(false);
   const [cocheEditando, setCocheEditando] = useState<number | null>(null);
   
-  // FOTO PRINCIPAL
   const [fotoArchivoCarro, setFotoArchivoCarro] = useState<File | null>(null);
   const [fotoPreviewCarro, setFotoPreviewCarro] = useState<string | null>(null);
   
-  // 📸 NUEVO: FOTOS EXTRA PARA LOTES (GALERÍA)
   const [fotosExtraNuevas, setFotosExtraNuevas] = useState<File[]>([]);
   const [fotosExtraPreview, setFotosExtraPreview] = useState<string[]>([]);
-  const [fotosExtraExistentes, setFotosExtraExistentes] = useState<string[]>([]); // URLs ya guardadas
+  const [fotosExtraExistentes, setFotosExtraExistentes] = useState<string[]>([]);
 
   const [nuevosLogros, setNuevosLogros] = useState<string[]>([]);
   const [misTrofeos, setMisTrofeos] = useState<any[]>([]);
 
+  // 🔨 AÑADIMOS LOS CAMPOS DE SUBASTA
   const [nuevoCarro, setNuevoCarro] = useState({
     modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "",
     id_serie: "", otra_serie: "", rareza: "", id_presentacion: "", otra_presentacion: "", valor: "", id_escala: "", id_estado_carro: "", 
     no_carro: "", total_carros: "", anio_serie: "", para_cambio: false, para_venta: false,
-    es_lote: false, es_preventa: false, fecha_llegada: ""
+    es_lote: false, es_preventa: false, fecha_llegada: "",
+    es_subasta: false, precio_inicial: "", incremento_minimo: "10", fecha_cierre_subasta: ""
   });
 
   const [archivosRafaga, setArchivosRafaga] = useState<{ file: File, preview: string, modelo: string, id_marca: string, valor: string }[]>([]);
@@ -212,6 +210,7 @@ export default function MiPanelUsuario() {
         }
       }
 
+      // 🔨 Traemos también es_subasta
       const { data: carrosData } = await supabase.from('carro').select(`*, marca(marca), serie(*), fabricante(fabricante), presentacion(presentacion)`).eq('id_usuario', perfilData.id_usuario).order('id_carro', { ascending: false });
       if (carrosData) setMisCarros(carrosData);
 
@@ -321,7 +320,6 @@ export default function MiPanelUsuario() {
     }
   }, [nuevoCarro.id_serie, series]);
 
-  // 📸 FUNCIÓN PARA MANEJAR SELECCIÓN DE FOTOS EXTRA
   const manejarFotosExtra = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -420,21 +418,64 @@ export default function MiPanelUsuario() {
       escala: parseInt(nuevoCarro.id_escala) || null, estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, no_carro: parseInt(nuevoCarro.no_carro) || null, 
       para_cambio: nuevoCarro.para_cambio, para_venta: nuevoCarro.para_venta,
       es_lote: nuevoCarro.es_lote, es_preventa: nuevoCarro.es_preventa, fecha_llegada: nuevoCarro.es_preventa ? (nuevoCarro.fecha_llegada || null) : null,
-      // 📸 GUARDAMOS EL ARREGLO DE FOTOS EXTRA (Vacío si no es lote)
-      galeria: nuevoCarro.es_lote ? urlsExtraFinales : [] 
+      galeria: nuevoCarro.es_lote ? urlsExtraFinales : [],
+      es_subasta: nuevoCarro.es_subasta // 🔨 Guardamos la bandera
     };
     if (imagenUrlFinal) payload.imagen_url = imagenUrlFinal;
 
+    let idCarroFinal = cocheEditando;
+
     if (cocheEditando) {
       const { error } = await supabase.from('carro').update(payload).eq('id_carro', cocheEditando);
-      if (error) alert("Error al editar: " + error.message); else { cargarDatosCentrales(); cerrarModal(); alert("¡Publicación actualizada!"); }
+      if (error) { alert("Error al editar: " + error.message); setGuardandoCarro(false); return; }
     } else {
       payload.id_usuario = miPerfil.id_usuario;
       payload.estado_aprobacion = 'APROBADO'; 
-      const { error } = await supabase.from('carro').insert([payload]);
-      if (error) alert("Error al registrar: " + error.message); else { cargarDatosCentrales(); cerrarModal(); const medallasGanadas = await evaluarLogros(miPerfil.id_usuario); if (medallasGanadas && medallasGanadas.length > 0) setNuevosLogros(medallasGanadas); }
+      // 🔨 Guardamos y obtenemos el ID recién creado
+      const { data: newCarroData, error } = await supabase.from('carro').insert([payload]).select().single();
+      if (error) { alert("Error al registrar: " + error.message); setGuardandoCarro(false); return; }
+      idCarroFinal = newCarroData.id_carro;
     }
+
+    // 🔨 MAGIA: GESTIÓN DE LA TABLA SUBASTA
+    if (nuevoCarro.es_subasta && idCarroFinal) {
+      const subastaPayload: any = {
+          id_carro: idCarroFinal,
+          id_vendedor: miPerfil.id_usuario,
+          precio_inicial: parseFloat(nuevoCarro.precio_inicial) || 0,
+          incremento_minimo: parseFloat(nuevoCarro.incremento_minimo) || 10,
+          fecha_cierre: new Date(nuevoCarro.fecha_cierre_subasta).toISOString(),
+          estado: 'ACTIVA'
+      };
+
+      if (cocheEditando) {
+          // Revisamos si ya existía la subasta
+          const { data: existingSubasta } = await supabase.from('subasta').select('id_subasta').eq('id_carro', idCarroFinal).single();
+          if (existingSubasta) {
+              await supabase.from('subasta').update(subastaPayload).eq('id_subasta', existingSubasta.id_subasta);
+          } else {
+              subastaPayload.precio_actual = subastaPayload.precio_inicial;
+              await supabase.from('subasta').insert([subastaPayload]);
+          }
+      } else {
+          subastaPayload.precio_actual = subastaPayload.precio_inicial;
+          await supabase.from('subasta').insert([subastaPayload]);
+      }
+    } else if (!nuevoCarro.es_subasta && cocheEditando) {
+        // Si antes era subasta y la apagaron, borramos el registro
+        await supabase.from('subasta').delete().eq('id_carro', idCarroFinal);
+    }
+
     setGuardandoCarro(false);
+    cargarDatosCentrales(); 
+    cerrarModal();
+    
+    if (!cocheEditando) {
+      const medallasGanadas = await evaluarLogros(miPerfil.id_usuario); 
+      if (medallasGanadas && medallasGanadas.length > 0) setNuevosLogros(medallasGanadas); 
+    } else {
+      alert("¡Publicación actualizada exitosamente!");
+    }
   };
 
   const manejarSeleccionMasiva = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -603,13 +644,27 @@ export default function MiPanelUsuario() {
   };
 
 
-  const abrirModalCarro = (carro: any = null) => {
+  const abrirModalCarro = async (carro: any = null) => {
     if (carro) {
       setCocheEditando(carro.id_carro);
       const idMarcaReal = marcas.find(m => m.marca === carro.marca?.marca)?.id_marca || "";
       const idSerieReal = carro.serie?.id_serie || "";
-      
       const idRarezaReal = rarezas.find(r => r.rareza === carro.rareza && r.id_fabricante === carro.id_fabricante)?.id_rareza || carro.rareza;
+
+      // 🔨 Si es subasta, traemos los datos de la tabla subasta
+      let subData = null;
+      if (carro.es_subasta) {
+        const { data } = await supabase.from('subasta').select('*').eq('id_carro', carro.id_carro).single();
+        subData = data;
+      }
+
+      // Hack rápido para formatear a datetime-local (YYY-MM-DDTHH:mm)
+      let fechaCierreStr = "";
+      if (subData?.fecha_cierre) {
+        const d = new Date(subData.fecha_cierre);
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        fechaCierreStr = d.toISOString().slice(0, 16);
+      }
 
       setNuevoCarro({ 
         modelo: carro.modelo || "", 
@@ -632,11 +687,15 @@ export default function MiPanelUsuario() {
         para_venta: carro.para_venta || false,
         es_lote: carro.es_lote || false,
         es_preventa: carro.es_preventa || false,
-        fecha_llegada: carro.fecha_llegada || ""
+        fecha_llegada: carro.fecha_llegada || "",
+        // 🔨 Cargar datos de subasta
+        es_subasta: carro.es_subasta || false,
+        precio_inicial: subData ? subData.precio_inicial.toString() : "",
+        incremento_minimo: subData ? subData.incremento_minimo.toString() : "10",
+        fecha_cierre_subasta: fechaCierreStr
       });
       setFotoPreviewCarro(carro.imagen_url || null);
       
-      // 📸 CARGAMOS LA GALERÍA EXISTENTE SI ES LOTE
       if (carro.es_lote && carro.galeria) {
         setFotosExtraExistentes(carro.galeria);
       } else {
@@ -651,7 +710,7 @@ export default function MiPanelUsuario() {
       setFotosExtraExistentes([]);
       setFotosExtraNuevas([]);
       setFotosExtraPreview([]);
-      setNuevoCarro({ modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "", id_serie: "", otra_serie: "", rareza: "", id_presentacion: "", otra_presentacion: "", valor: "", id_escala: "", id_estado_carro: "", no_carro: "", total_carros: "", anio_serie: "", para_cambio: false, para_venta: false, es_lote: false, es_preventa: false, fecha_llegada: "" });
+      setNuevoCarro({ modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "", id_serie: "", otra_serie: "", rareza: "", id_presentacion: "", otra_presentacion: "", valor: "", id_escala: "", id_estado_carro: "", no_carro: "", total_carros: "", anio_serie: "", para_cambio: false, para_venta: false, es_lote: false, es_preventa: false, fecha_llegada: "", es_subasta: false, precio_inicial: "", incremento_minimo: "10", fecha_cierre_subasta: "" });
     }
     setFotoArchivoCarro(null); setIsModalOpen(true);
   };
@@ -773,11 +832,13 @@ export default function MiPanelUsuario() {
                     >
                       {carro.estado_aprobacion === 'PENDIENTE' && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">REVISIÓN</div>}
                       {carro.para_cambio && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">CAMBIO</div>}
-                      {carro.para_venta && !carro.es_preventa && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">💲 EN VENTA</div>}
+                      {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">💲 EN VENTA</div>}
                       
-                      {/* ⏳ ETIQUETAS NUEVAS: PREVENTA Y LOTE */}
                       {carro.es_preventa && <div className="absolute top-2 right-2 z-20 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
                       {carro.es_lote && <div className="absolute top-2 left-2 z-20 bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">📦 LOTE</div>}
+                      
+                      {/* 🔨 ETIQUETA DE SUBASTA */}
+                      {carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
                       
                       <div className={`absolute inset-0 bg-slate-900/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2 transition-opacity duration-300 rounded-2xl p-2 ${tarjetaActiva === carro.id_carro ? 'opacity-100' : 'opacity-0 lg:group-hover:opacity-100'}`}>
                         <button onClick={(e) => { e.stopPropagation(); abrirModalCarro(carro); }} className="w-full max-w-[120px] bg-white text-slate-800 py-2 rounded-lg shadow-lg font-bold text-xs hover:bg-slate-200 transition-transform active:scale-95">Editar</button>
@@ -814,7 +875,7 @@ export default function MiPanelUsuario() {
       </div>
 
       {/* =================================================================================================================
-          🧠 MODAL DE BÓVEDA CON BUSCADORES INTELIGENTES Y HERRAMIENTAS PRO (LOTES / PREVENTA)
+          🧠 MODAL DE BÓVEDA CON BUSCADORES INTELIGENTES Y HERRAMIENTAS PRO
           ================================================================================================================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200 overflow-y-auto pt-10 pb-10">
@@ -837,40 +898,33 @@ export default function MiPanelUsuario() {
                 </label>
               </div>
 
-              {/* 📦 HERRAMIENTA PRO: INTERRUPTOR DE LOTE */}
               {(miPerfil?.rol === 'VENDEDOR' || miPerfil?.rol === 'SUPER_ADMIN') && (
-                <div className={`border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${nuevoCarro.es_lote ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-200'}`} onClick={() => setNuevoCarro({...nuevoCarro, es_lote: !nuevoCarro.es_lote})}>
+                <div className={`border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${nuevoCarro.es_lote ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-200'}`} onClick={() => setNuevoCarro({...nuevoCarro, es_lote: !nuevoCarro.es_lote, es_subasta: false})}>
                   <div>
                     <p className={`text-sm font-bold flex items-center gap-2 ${nuevoCarro.es_lote ? 'text-purple-700' : 'text-slate-600'}`}>📦 Vender como Lote</p>
-                    <p className="text-xs text-slate-500 mt-1">Desactiva la IA y te permite describir múltiples autos.</p>
+                    <p className="text-xs text-slate-500 mt-1">Desactiva la IA y te permite subir galería extra.</p>
                   </div>
                   <div className={`w-12 h-6 rounded-full flex items-center transition-colors px-1 ${nuevoCarro.es_lote ? 'bg-purple-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${nuevoCarro.es_lote ? 'translate-x-6' : 'translate-x-0'}`}></div></div>
                 </div>
               )}
 
-              {/* 📸 ÁREA DE FOTOS ADICIONALES (SOLO SI ES LOTE) */}
               {nuevoCarro.es_lote && (
                 <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-4 animate-in fade-in slide-in-from-top-2">
                   <label className="text-[10px] text-purple-600 font-bold uppercase tracking-wider mb-2 block">📸 Fotos Adicionales del Lote (Max 5)</label>
                   
                   <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                    {/* Fotos Existentes (Si está editando) */}
                     {fotosExtraExistentes.map((url, i) => (
                       <div key={`ext-${i}`} className="w-20 h-20 shrink-0 rounded-lg overflow-hidden border border-slate-200 relative group">
                         <img src={url} alt={`Extra ${i}`} className="w-full h-full object-cover" />
                         <button type="button" onClick={() => eliminarFotoExtraExistente(i)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
                       </div>
                     ))}
-
-                    {/* Fotos Nuevas Seleccionadas */}
                     {fotosExtraPreview.map((url, i) => (
                       <div key={`new-${i}`} className="w-20 h-20 shrink-0 rounded-lg overflow-hidden border border-slate-200 relative group">
                         <img src={url} alt={`Nueva ${i}`} className="w-full h-full object-cover" />
                         <button type="button" onClick={() => eliminarFotoExtraNueva(i)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
                       </div>
                     ))}
-
-                    {/* Botón para agregar más */}
                     {(fotosExtraNuevas.length + fotosExtraExistentes.length) < 5 && (
                       <div className="w-20 h-20 shrink-0">
                         <input type="file" multiple accept="image/*" id="fotos-extra" className="hidden" onChange={manejarFotosExtra} />
@@ -938,43 +992,80 @@ export default function MiPanelUsuario() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="z-[26] sm:col-start-2">
-                    <div className="flex justify-between items-end mb-1">
-                      <label className="text-xs text-slate-500 font-bold uppercase tracking-wider block">Valor del Vendedor ($)</label>
-                      {!cocheEditando && nuevoCarro.modelo && !nuevoCarro.es_lote && <span className="text-[9px] bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-bold">IA Automática 🤖</span>}
-                    </div>
-                    <input type="number" step="0.01" placeholder="0.00" value={nuevoCarro.valor} onChange={(e) => setNuevoCarro({...nuevoCarro, valor: e.target.value})} className="w-full bg-slate-50 border border-slate-300 text-emerald-600 font-black rounded-xl px-4 py-3 outline-none focus:border-cyan-500 shadow-sm" />
-                  </div>
-                </div>
-
-                {/* 🛒 SECCIÓN DE VENTA / NEGOCIACIÓN */}
+                {/* 🛒 SECCIÓN DE VENTA / NEGOCIACIÓN / SUBASTA */}
                 {miPerfil?.rol === 'VENDEDOR' || miPerfil?.rol === 'SUPER_ADMIN' ? (
                   <div className="space-y-2 mt-2">
-                    <div className={`border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${nuevoCarro.para_venta ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`} onClick={() => setNuevoCarro({...nuevoCarro, para_venta: !nuevoCarro.para_venta, para_cambio: false})}>
+                    
+                    {/* Botón Maestro de Venta */}
+                    <div className={`border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${nuevoCarro.para_venta ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`} onClick={() => setNuevoCarro({...nuevoCarro, para_venta: !nuevoCarro.para_venta, para_cambio: false, es_subasta: false, es_preventa: false})}>
                       <div>
                         <p className={`text-sm font-bold flex items-center gap-2 ${nuevoCarro.para_venta ? 'text-amber-700' : 'text-slate-600'}`}>💲 En Venta</p>
-                        <p className="text-xs text-slate-500 mt-1">Se publicará con botón de compra en la tienda.</p>
+                        <p className="text-xs text-slate-500 mt-1">Se publicará en la tienda de Collectors.</p>
                       </div>
                       <div className={`w-12 h-6 rounded-full flex items-center transition-colors px-1 ${nuevoCarro.para_venta ? 'bg-amber-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${nuevoCarro.para_venta ? 'translate-x-6' : 'translate-x-0'}`}></div></div>
                     </div>
 
-                    {/* ⏳ HERRAMIENTA PRO: INTERRUPTOR DE PREVENTA (Solo si está en venta) */}
                     {nuevoCarro.para_venta && (
-                      <div className={`border p-4 rounded-xl flex flex-col gap-3 transition-colors ${nuevoCarro.es_preventa ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'}`}>
-                        <div className="flex items-center justify-between cursor-pointer" onClick={() => setNuevoCarro({...nuevoCarro, es_preventa: !nuevoCarro.es_preventa})}>
-                          <div>
-                            <p className={`text-sm font-bold flex items-center gap-2 ${nuevoCarro.es_preventa ? 'text-indigo-700' : 'text-slate-600'}`}>⏳ Es Preventa (Apartado)</p>
-                            <p className="text-xs text-slate-500 mt-1">Cambia el botón de "Comprar" a "Apartar con el Vendedor".</p>
-                          </div>
-                          <div className={`w-12 h-6 rounded-full flex items-center transition-colors px-1 ${nuevoCarro.es_preventa ? 'bg-indigo-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${nuevoCarro.es_preventa ? 'translate-x-6' : 'translate-x-0'}`}></div></div>
-                        </div>
+                      <div className="pl-4 border-l-2 border-slate-200 space-y-2 ml-4">
                         
-                        {nuevoCarro.es_preventa && (
-                          <div className="animate-in fade-in slide-in-from-top-2 pt-2 border-t border-indigo-100">
-                            <label className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider mb-1 block">Fecha Estimada de Llegada *</label>
-                            <input type="date" required={nuevoCarro.es_preventa} value={nuevoCarro.fecha_llegada} onChange={(e) => setNuevoCarro({...nuevoCarro, fecha_llegada: e.target.value})} className="w-full bg-white border border-indigo-200 text-indigo-900 font-medium rounded-lg px-3 py-2 outline-none focus:border-indigo-400 shadow-sm text-sm" />
+                        {/* 🔨 INTERRUPTOR DE SUBASTA */}
+                        <div className={`border p-4 rounded-xl flex flex-col gap-3 transition-colors ${nuevoCarro.es_subasta ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
+                          <div className="flex items-center justify-between cursor-pointer" onClick={() => setNuevoCarro({...nuevoCarro, es_subasta: !nuevoCarro.es_subasta, es_preventa: false, es_lote: false})}>
+                            <div>
+                              <p className={`text-sm font-bold flex items-center gap-2 ${nuevoCarro.es_subasta ? 'text-rose-700' : 'text-slate-600'}`}>🔨 Enviar a Subasta</p>
+                              <p className="text-xs text-slate-500 mt-1">Recibe pujas en tiempo real. Desactiva lotes y preventas.</p>
+                            </div>
+                            <div className={`w-12 h-6 rounded-full flex items-center transition-colors px-1 ${nuevoCarro.es_subasta ? 'bg-rose-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${nuevoCarro.es_subasta ? 'translate-x-6' : 'translate-x-0'}`}></div></div>
                           </div>
+                          
+                          {nuevoCarro.es_subasta && (
+                            <div className="animate-in fade-in slide-in-from-top-2 pt-2 border-t border-rose-100 flex flex-col gap-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] text-rose-500 font-bold uppercase tracking-wider mb-1 block">Precio Inicial ($) *</label>
+                                        <input type="number" required={nuevoCarro.es_subasta} value={nuevoCarro.precio_inicial} onChange={(e) => setNuevoCarro({...nuevoCarro, precio_inicial: e.target.value})} className="w-full bg-white border border-rose-200 text-rose-900 font-bold rounded-lg px-3 py-2 outline-none focus:border-rose-400 shadow-sm text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-rose-500 font-bold uppercase tracking-wider mb-1 block">Puja Mínima ($) *</label>
+                                        <input type="number" required={nuevoCarro.es_subasta} value={nuevoCarro.incremento_minimo} onChange={(e) => setNuevoCarro({...nuevoCarro, incremento_minimo: e.target.value})} className="w-full bg-white border border-rose-200 text-rose-900 font-bold rounded-lg px-3 py-2 outline-none focus:border-rose-400 shadow-sm text-sm" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-rose-500 font-bold uppercase tracking-wider mb-1 block">Fecha y Hora de Cierre *</label>
+                                    <input type="datetime-local" required={nuevoCarro.es_subasta} value={nuevoCarro.fecha_cierre_subasta} onChange={(e) => setNuevoCarro({...nuevoCarro, fecha_cierre_subasta: e.target.value})} className="w-full bg-white border border-rose-200 text-rose-900 font-medium rounded-lg px-3 py-2 outline-none focus:border-rose-400 shadow-sm text-sm" />
+                                </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ⏳ INTERRUPTOR DE PREVENTA (Oculto si es Subasta) */}
+                        {!nuevoCarro.es_subasta && (
+                          <div className={`border p-4 rounded-xl flex flex-col gap-3 transition-colors ${nuevoCarro.es_preventa ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className="flex items-center justify-between cursor-pointer" onClick={() => setNuevoCarro({...nuevoCarro, es_preventa: !nuevoCarro.es_preventa})}>
+                              <div>
+                                <p className={`text-sm font-bold flex items-center gap-2 ${nuevoCarro.es_preventa ? 'text-indigo-700' : 'text-slate-600'}`}>⏳ Es Preventa</p>
+                              </div>
+                              <div className={`w-12 h-6 rounded-full flex items-center transition-colors px-1 ${nuevoCarro.es_preventa ? 'bg-indigo-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${nuevoCarro.es_preventa ? 'translate-x-6' : 'translate-x-0'}`}></div></div>
+                            </div>
+                            
+                            {nuevoCarro.es_preventa && (
+                              <div className="animate-in fade-in slide-in-from-top-2 pt-2 border-t border-indigo-100">
+                                <label className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider mb-1 block">Fecha de Llegada *</label>
+                                <input type="date" required={nuevoCarro.es_preventa} value={nuevoCarro.fecha_llegada} onChange={(e) => setNuevoCarro({...nuevoCarro, fecha_llegada: e.target.value})} className="w-full bg-white border border-indigo-200 text-indigo-900 font-medium rounded-lg px-3 py-2 outline-none focus:border-indigo-400 shadow-sm text-sm" />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* 💲 VALOR DIRECTO (Oculto si es Subasta) */}
+                        {!nuevoCarro.es_subasta && (
+                           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                              <div className="flex justify-between items-end mb-1">
+                                <label className="text-xs text-slate-500 font-bold uppercase tracking-wider block">Valor de Venta ($)</label>
+                                {!cocheEditando && nuevoCarro.modelo && !nuevoCarro.es_lote && <span className="text-[9px] bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-bold">IA Automática 🤖</span>}
+                              </div>
+                              <input type="number" step="0.01" required={nuevoCarro.para_venta} placeholder="0.00" value={nuevoCarro.valor} onChange={(e) => setNuevoCarro({...nuevoCarro, valor: e.target.value})} className="w-full bg-white border border-slate-300 text-emerald-600 font-black rounded-lg px-4 py-3 outline-none focus:border-cyan-500 shadow-sm" />
+                           </div>
                         )}
                       </div>
                     )}

@@ -4,25 +4,21 @@ import Link from 'next/link';
 import { Metadata } from 'next'; 
 import BotonReportar from '@/components/BotonReportar';
 import BotonCompartir from '@/components/BotonCompartir'; 
-import GaleriaImagenes from '@/components/GaleriaImagenes'; // 🧠 IMPORTAMOS LA NUEVA GALERÍA
+import GaleriaImagenes from '@/components/GaleriaImagenes'; 
+import SubastaEnVivo from '@/components/SubastaEnVivo'; // 🔨 1. IMPORTAMOS EL WIDGET DE SUBASTAS
 
 export const revalidate = 60; 
 
 // =========================================================================
-// 🚀 MAGIA SEO: ESTO GENERA LA VISTA PREVIA EN WHATSAPP Y FACEBOOK
+// 🚀 MAGIA SEO
 // =========================================================================
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const resolvedParams = await params;
   const idCarro = resolvedParams.id;
-  
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get() { return ''; } } });
-  
   const { data: carro } = await supabase.from('carro').select('modelo, marca(marca), valor, imagen_url, usuario:id_usuario(nombre_usuario)').eq('id_carro', idCarro).single();
-
   if (!carro) return { title: 'Pieza no encontrada - Collectors' };
-
   const carroData = carro as any;
-
   const titulo = `${carroData.modelo} (${carroData.marca?.marca || 'Custom'}) | Collectors`;
   const descripcion = `Mira esta increíble pieza en la bóveda de @${carroData.usuario?.nombre_usuario || 'un coleccionista'}. Valuada en $${carroData.valor}. ¡Entra a Collectors para ver los detalles!`;
   const urlImagen = carroData.imagen_url || 'https://collectors-app-ecru.vercel.app/favicon.ico'; 
@@ -30,18 +26,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title: titulo,
     description: descripcion,
-    openGraph: {
-      title: titulo,
-      description: descripcion,
-      images: [urlImagen],
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: titulo,
-      description: descripcion,
-      images: [urlImagen],
-    }
+    openGraph: { title: titulo, description: descripcion, images: [urlImagen], type: 'website' },
+    twitter: { card: 'summary_large_image', title: titulo, description: descripcion, images: [urlImagen] }
   };
 }
 // =========================================================================
@@ -96,7 +82,13 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
     }
   }
 
-  // ALGORITMO DE AMIGOS MUTUOS 🤝 (Para intercambios)
+  // 🔨 2. TRAER DATOS DE LA SUBASTA (Si aplica)
+  let subastaData = null;
+  if (carro.es_subasta) {
+    const { data: sub } = await supabase.from('subasta').select('*').eq('id_carro', idCarro).single();
+    subastaData = sub;
+  }
+
   let sonMutuos = false;
   if (miIdUsuario && carro.usuario?.id_usuario && !esMiPieza) {
     const [yoSigo, meSigue] = await Promise.all([
@@ -106,7 +98,6 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
     if (yoSigo.data && meSigue.data) sonMutuos = true;
   }
 
-  // LÓGICA DE NEGOCIACIÓN
   const esVenta = carro.para_venta;
   const esCambio = carro.para_cambio;
 
@@ -143,16 +134,8 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
 
       <div className="max-w-6xl mx-auto px-4 mt-6 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
         
-        {/* =========================================================
-            📸 LADO IZQUIERDO: GALERÍA INTERACTIVA (AHORA CON COMPONENTE)
-            ========================================================= */}
         <div className="lg:col-span-7 flex flex-col gap-4">
-          <GaleriaImagenes 
-            imagenPrincipal={carro.imagen_url} 
-            galeria={carro.galeria} 
-            modelo={carro.modelo}
-          >
-            {/* Etiquetas Superiores Izquierdas */}
+          <GaleriaImagenes imagenPrincipal={carro.imagen_url} galeria={carro.galeria} modelo={carro.modelo}>
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-2 items-start">
               <div className="bg-white/90 backdrop-blur-md border border-slate-200 text-slate-800 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-md">
                 {carro.rareza || 'ESTÁNDAR'}
@@ -164,34 +147,26 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               )}
             </div>
             
-            {/* Etiquetas Dinámicas PRO Superiores Derechas */}
             <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 items-end">
               {carro.es_lote && (
-                <div className="bg-purple-600/90 backdrop-blur-md border border-purple-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1">
-                  📦 LOTE
-                </div>
+                <div className="bg-purple-600/90 backdrop-blur-md border border-purple-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1">📦 LOTE</div>
               )}
-              {esVenta && !carro.es_preventa && (
-                <div className="bg-amber-500/90 backdrop-blur-md border border-amber-400 text-slate-900 text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1">
-                  💲 EN VENTA
-                </div>
+              {esVenta && !carro.es_preventa && !carro.es_subasta && (
+                <div className="bg-amber-500/90 backdrop-blur-md border border-amber-400 text-slate-900 text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1">💲 EN VENTA</div>
               )}
               {carro.es_preventa && (
-                <div className="bg-indigo-600/90 backdrop-blur-md border border-indigo-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md shadow-indigo-500/50 animate-pulse flex items-center gap-1">
-                  ⏳ PREVENTA
-                </div>
+                <div className="bg-indigo-600/90 backdrop-blur-md border border-indigo-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md shadow-indigo-500/50 animate-pulse flex items-center gap-1">⏳ PREVENTA</div>
+              )}
+              {carro.es_subasta && (
+                <div className="bg-rose-600/90 backdrop-blur-md border border-rose-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md shadow-rose-500/50 animate-bounce flex items-center gap-1">🔨 SUBASTA</div>
               )}
               {esCambio && !esVenta && (
-                <div className="bg-emerald-500/90 backdrop-blur-md border border-emerald-400 text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                  CAMBIO
-                </div>
+                <div className="bg-emerald-500/90 backdrop-blur-md border border-emerald-400 text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg> CAMBIO</div>
               )}
             </div>
           </GaleriaImagenes>
         </div>
 
-        {/* LADO DERECHO: DETALLES */}
         <div className="lg:col-span-5 flex flex-col">
           
           <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 hover:border-cyan-400 transition-colors w-fit mb-6 group shadow-sm">
@@ -247,7 +222,6 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
-          {/* 🧠 CUADRO ESPECIAL DE PREVENTA */}
           {carro.es_preventa && carro.fecha_llegada && (
             <div className="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 shadow-sm mb-8 flex items-center gap-4 animate-in fade-in">
               <div className="text-4xl">⏳</div>
@@ -258,32 +232,43 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
             </div>
           )}
 
-          {/* COMPARATIVA DE PRECIOS */}
-          <div className="grid grid-cols-2 gap-4 mb-10">
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left">
-              <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Precio del Dueño</p>
-              <p className="text-3xl font-black text-slate-900">${carro.valor ? carro.valor.toLocaleString() : '0'}</p>
+          {/* Ocultamos esto si es subasta, porque la subasta tiene su propio panel de precio */}
+          {!carro.es_subasta && (
+            <div className="grid grid-cols-2 gap-4 mb-10">
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left">
+                <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Precio del Dueño</p>
+                <p className="text-3xl font-black text-slate-900">${carro.valor ? carro.valor.toLocaleString() : '0'}</p>
+              </div>
+              <div className="bg-cyan-50 border border-cyan-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-400/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                <p className="text-[10px] text-cyan-700 uppercase font-black tracking-widest mb-1 relative z-10 flex items-center gap-1.5">
+                  Valuación IA 
+                  <span className="text-[8px] bg-cyan-600 text-white px-1.5 py-0.5 rounded shadow-sm">BETA</span>
+                </p>
+                {carro.es_lote ? (
+                  <>
+                    <p className="text-2xl font-black text-cyan-800 relative z-10 opacity-50">N/A</p>
+                    <p className="text-[9px] text-cyan-600 font-bold mt-1 relative z-10">La IA no valúa lotes.</p>
+                  </>
+                ) : (
+                  <p className="text-3xl font-black text-cyan-800 relative z-10">${carro.valor_calculado ? carro.valor_calculado.toLocaleString() : '0'}</p>
+                )}
+              </div>
             </div>
-            <div className="bg-cyan-50 border border-cyan-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-400/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-              <p className="text-[10px] text-cyan-700 uppercase font-black tracking-widest mb-1 relative z-10 flex items-center gap-1.5">
-                Valuación IA 
-                <span className="text-[8px] bg-cyan-600 text-white px-1.5 py-0.5 rounded shadow-sm">BETA</span>
-              </p>
-              {/* 🧠 SI ES LOTE, OCULTAMOS LA VALUACIÓN */}
-              {carro.es_lote ? (
-                <>
-                  <p className="text-2xl font-black text-cyan-800 relative z-10 opacity-50">N/A</p>
-                  <p className="text-[9px] text-cyan-600 font-bold mt-1 relative z-10">La IA no valúa lotes.</p>
-                </>
-              ) : (
-                <p className="text-3xl font-black text-cyan-800 relative z-10">${carro.valor_calculado ? carro.valor_calculado.toLocaleString() : '0'}</p>
-              )}
-            </div>
-          </div>
+          )}
 
-          {/* ÁREA DE NEGOCIACIÓN INTELIGENTE */}
-          {esMiPieza ? (
+          {/* 🔨 3. MOTOR INTELIGENTE DE NEGOCIACIÓN O SUBASTA */}
+          {carro.es_subasta && subastaData ? (
+            <div className="mb-10">
+              <SubastaEnVivo 
+                subastaInicial={subastaData} 
+                miIdUsuario={miIdUsuario} 
+                esMiPieza={esMiPieza} 
+                telefonoVendedor={carro.usuario?.whatsapp ? carro.usuario.whatsapp.toString() : null}
+                modeloCarro={carro.modelo}
+              />
+            </div>
+          ) : esMiPieza ? (
             <div className="bg-cyan-50 border border-cyan-200 rounded-2xl p-5 text-center shadow-sm">
               <p className="text-cyan-700 font-black">💎 Esta pieza está en tu Garaje</p>
               {esVenta ? <p className="text-xs text-slate-600 mt-1 font-medium">Actualmente la tienes en venta en la Tienda.</p> : esCambio ? <p className="text-xs text-slate-600 mt-1 font-medium">Actualmente la tienes marcada para Intercambio.</p> : <p className="text-xs text-slate-600 mt-1 font-medium">Actualmente la tienes marcada como Solo Exhibición.</p>}
