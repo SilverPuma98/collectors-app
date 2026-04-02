@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import Link from "next/link"; // 🧠 Importante para poder abrir los perfiles o autos
+import Link from "next/link"; 
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -25,7 +25,7 @@ export default function AdminDashboard() {
   const [coches, setCoches] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [boletines, setBoletines] = useState<any[]>([]);
-  const [reportes, setReportes] = useState<any[]>([]); // 🚨 NUEVO: REPORTES DE AUTOS FALSOS
+  const [reportes, setReportes] = useState<any[]>([]); 
 
   // ESTADOS DE UI
   const [modalAbierto, setModalAbierto] = useState<string | null>(null);
@@ -92,13 +92,11 @@ export default function AdminDashboard() {
       const resBol = await supabase.from('boletin_comprador').select('*, vendedor:usuario!id_vendedor(nombre_usuario), comprador:usuario!id_comprador(nombre_usuario)').order('created_at', { ascending: false });
       if (resBol.data) setBoletines(resBol.data);
 
-      // 🚨 CARGAMOS LOS REPORTES DE AUTOS FALSOS O ROBADOS
       const resRep = await supabase.from('reporte_carro').select('*, carro(modelo, id_carro, imagen_url), usuario(nombre_usuario)').order('estado', { ascending: false }).order('created_at', { ascending: false });
       if (resRep.data) setReportes(resRep.data);
     }
   };
 
-  // FILTROS DE BÚSQUEDA
   const marcasFiltradas = marcas.filter(m => m.marca.toLowerCase().includes(busqueda.toLowerCase()));
   const fabricantesFiltrados = fabricantes.filter(f => f.fabricante.toLowerCase().includes(busqueda.toLowerCase()));
   const seriesFiltradas = series.filter(s => s.serie.toLowerCase().includes(busqueda.toLowerCase()));
@@ -154,6 +152,12 @@ export default function AdminDashboard() {
     if (error) alert("Error: " + error.message); else cargarTodosLosDatos(miRol);
   };
 
+  // 👑 NUEVA FUNCIÓN: OTORGAR O QUITAR EL ESTATUS DE FUNDADOR
+  const cambiarEstatusFundador = async (id_usuario: number, estadoActual: boolean) => {
+    const { error } = await supabase.from('usuario').update({ es_fundador: !estadoActual }).eq('id_usuario', id_usuario);
+    if (error) alert("Error: " + error.message); else cargarTodosLosDatos(miRol);
+  };
+
   const aprobarAuto = async (id_carro: number) => {
     const { error } = await supabase.from('carro').update({ estado_aprobacion: 'APROBADO' }).eq('id_carro', id_carro);
     if (error) alert("Error: " + error.message); else cargarTodosLosDatos(miRol);
@@ -172,7 +176,6 @@ export default function AdminDashboard() {
     if (error) alert("Error: " + error.message); else cargarTodosLosDatos(miRol);
   };
 
-  // 🚨 RESOLVER REPORTE DE AUTO FALSO
   const resolverReporte = async (id_reporte: number) => {
     const { error } = await supabase.from('reporte_carro').update({ estado: 'RESUELTO' }).eq('id_reporte', id_reporte);
     if (error) alert("Error: " + error.message); else cargarTodosLosDatos(miRol);
@@ -225,7 +228,6 @@ export default function AdminDashboard() {
                 {boletines.length > 0 && <span className="bg-red-900 text-red-100 border border-red-500 text-xs px-2 py-1 rounded-full ml-2">{boletines.length}</span>}
               </button>
 
-              {/* 🚨 BOTÓN DE REPORTES */}
               <button onClick={() => setTabActiva("reportes")} className={`whitespace-nowrap text-left px-4 py-3 rounded-lg font-medium transition-colors flex justify-between items-center ${tabActiva === "reportes" ? "bg-orange-900/40 border border-orange-900 text-orange-400" : "text-slate-400 hover:bg-slate-800/30"}`}>
                 <span>Autos Reportados</span>
                 {reportes.filter(r => r.estado === 'PENDIENTE').length > 0 && (
@@ -260,7 +262,8 @@ export default function AdminDashboard() {
                   {tabActiva === "series" && <><th className="pb-3 font-medium">Serie</th><th className="pb-3 font-medium">Fabricante</th><th className="pb-3 text-center font-medium">Año</th><th className="pb-3 text-center font-medium">Autos</th></>}
                   {tabActiva === "rarezas" && <><th className="pb-3 font-medium">Nivel de Rareza</th><th className="pb-3 font-medium">Fabricante</th></>}
                   {tabActiva === "presentaciones" && <><th className="pb-3 font-medium">Presentación / Empaque</th><th className="pb-3 font-medium">Fabricante</th></>}
-                  {tabActiva === "usuarios" && <><th className="pb-3 font-medium">Usuario / Correo</th><th className="pb-3 font-medium">Rol</th></>}
+                  {/* 👑 AÑADIMOS LA COLUMNA PRIVILEGIOS */}
+                  {tabActiva === "usuarios" && <><th className="pb-3 font-medium">Usuario / Correo</th><th className="pb-3 font-medium">Rol</th><th className="pb-3 font-medium text-center">Privilegios</th></>}
                   {tabActiva === "coches" && <><th className="pb-3 font-medium">Auto</th><th className="pb-3 font-medium">Estatus</th><th className="pb-3 font-medium text-center">Valor</th></>}
                   {tabActiva === "buzon" && <><th className="pb-3 font-medium">Tipo</th><th className="pb-3 font-medium">Usuario</th><th className="pb-3 font-medium">Mensaje</th><th className="pb-3 font-medium text-center">Estado</th></>}
                   {tabActiva === "boletines" && <><th className="pb-3 font-medium">Comprador Reportado</th><th className="pb-3 font-medium">Tienda (Denunciante)</th><th className="pb-3 font-medium">Motivo / Palabras Clave</th></>}
@@ -286,7 +289,16 @@ export default function AdminDashboard() {
                         <option value="USUARIO">Usuario (Base)</option><option value="VENDEDOR">Vendedor</option><option value="COLABORADOR">Colaborador</option><option value="SUPER_ADMIN">Súper Admin</option>
                       </select>
                     </td>
-                    <td className="py-3 text-right pr-2"><button onClick={() => eliminarRegistro('usuario', 'id_usuario', u.id_usuario)} className="text-red-500 font-bold p-2">Banear</button></td>
+                    {/* 👑 COLUMNA DE BOTÓN FUNDADOR */}
+                    <td className="py-3 text-center">
+                      <button 
+                        onClick={() => cambiarEstatusFundador(u.id_usuario, !!u.es_fundador)}
+                        className={`text-[10px] font-black px-3 py-1.5 rounded-full uppercase transition-all ${u.es_fundador ? 'bg-gradient-to-r from-amber-600 to-yellow-500 text-white shadow-[0_0_10px_rgba(245,158,11,0.5)] border border-amber-400' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700'}`}
+                      >
+                        {u.es_fundador ? '👑 Fundador' : 'Hacer Fundador'}
+                      </button>
+                    </td>
+                    <td className="py-3 text-right pr-2"><button onClick={() => eliminarRegistro('usuario', 'id_usuario', u.id_usuario)} className="text-red-500 font-bold p-2 hover:bg-red-900/30 rounded">Banear</button></td>
                   </tr>
                 ))}
 
@@ -332,7 +344,6 @@ export default function AdminDashboard() {
                   </tr>
                 ))}
 
-                {/* 🚨 RENDER DE LA TABLA DE REPORTES DE AUTOS FALSOS */}
                 {miRol === 'SUPER_ADMIN' && tabActiva === "reportes" && reportesFiltrados.map((r) => (
                   <tr key={r.id_reporte} className={`border-b border-slate-800/50 hover:bg-slate-800/30 ${r.estado === 'PENDIENTE' ? 'bg-orange-900/10' : 'opacity-60'}`}>
                     <td className="py-4 pl-2 text-slate-500">#{r.id_reporte}</td>

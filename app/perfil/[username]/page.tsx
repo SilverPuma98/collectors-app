@@ -94,7 +94,7 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
     );
   }
 
-  // 2. Buscamos sus autos públicos (📦 AHORA INCLUYE LA PRESENTACIÓN)
+  // 2. Buscamos sus autos públicos
   const { data: carros } = await supabase
     .from('carro')
     .select('*, marca(marca), presentacion(presentacion)')
@@ -149,7 +149,6 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
   const totalSeguidores = resSeguidores.count || 0;
   const totalSiguiendo = resSiguiendo.count || 0;
 
-  // 🧠 Separamos el valor del Dueño y el valor de la IA para mostrar ambos
   const totalAutos = carros ? carros.length : 0;
   const valorTotalUsuario = carros ? carros.reduce((acc, curr) => acc + (curr.valor || 0), 0) : 0;
   const valorTotalIA = carros ? carros.reduce((acc, curr) => acc + (curr.valor_calculado || 0), 0) : 0;
@@ -157,21 +156,17 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
   const esMio = miIdUsuario === perfil.id_usuario;
   const esVendedor = perfil.rol === 'VENDEDOR' || perfil.rol === 'SUPER_ADMIN';
 
-  // Lógica de visualización de contacto
   const mostrarContacto = esVendedor || sonMutuos || esMio;
 
-  // 🧠 MENSAJE DINÁMICO DE WHATSAPP CON EL @USUARIO
   const mensajeWhatsApp = miNombreUsuario ? `Hola, vengo de Collectors. Soy el usuario @${miNombreUsuario} y me interesa hacer un trato contigo.` : `Hola, vengo de Collectors y me interesa hacer un trato contigo.`;
   const enlaceWhatsApp = perfil.whatsapp ? `https://wa.me/${perfil.whatsapp}?text=${encodeURIComponent(mensajeWhatsApp)}` : null;
   const enlaceFacebook = perfil.facebook ? (perfil.facebook.startsWith('http') ? perfil.facebook : `https://${perfil.facebook}`) : null;
   const enlaceMaps = perfil.link_maps ? (perfil.link_maps.startsWith('http') ? perfil.link_maps : `https://${perfil.link_maps}`) : null;
 
-  // Extraer ubicación
   const nombreMunicipio = perfil.municipio?.municipio || "";
   const nombreEstado = perfil.municipio?.estado?.estado || "";
   const ubicacion = nombreMunicipio && nombreEstado ? `${nombreMunicipio}, ${nombreEstado}` : (nombreEstado || "Ubicación no registrada");
 
-  // Colores mini para las medallas
   const getMiniRarezaColor = (rareza: string) => {
     switch (rareza?.toLowerCase()) {
       case "mítico": return "border-cyan-400 bg-cyan-50 text-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.4)]";
@@ -187,12 +182,19 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
     <main className="min-h-screen bg-slate-50 selection:bg-cyan-200 selection:text-cyan-900 pb-20 font-sans">
       
       {/* HEADER DEL PERFIL */}
-      <div className="bg-white border-b border-slate-200 pt-10 pb-8 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10">
+      <div className="bg-white border-b border-slate-200 pt-10 pb-8 shadow-sm relative overflow-hidden">
+        
+        {/* 👑 AURA DORADA PARA FUNDADORES (Fondo) */}
+        {perfil.es_fundador && (
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-64 bg-amber-500/10 rounded-full blur-[80px] pointer-events-none"></div>
+        )}
+
+        <div className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10 relative z-10">
           
           {/* Avatar y Nivel */}
           <div className="flex flex-col items-center gap-4">
-            <div className={`relative w-32 h-32 md:w-40 md:h-40 rounded-full border-4 shadow-xl flex-shrink-0 bg-slate-200 overflow-hidden ${esVendedor ? 'border-amber-400' : 'border-white'}`}>
+            {/* 👑 BORDE DORADO ESPECIAL SI ES FUNDADOR */}
+            <div className={`relative w-32 h-32 md:w-40 md:h-40 rounded-full border-4 shadow-xl flex-shrink-0 bg-slate-200 overflow-hidden ${perfil.es_fundador ? 'border-amber-400 shadow-amber-500/30' : (esVendedor ? 'border-cyan-600' : 'border-white')}`}>
               {perfil.link_img_perf ? (
                 <img src={perfil.link_img_perf} alt={perfil.nombre_usuario} className="w-full h-full object-cover" />
               ) : (
@@ -200,18 +202,20 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
                   <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                 </div>
               )}
-              {esVendedor && (
-                <div className="absolute bottom-0 w-full bg-amber-500 text-white text-[10px] font-black text-center py-1">TIENDA PRO</div>
+              {esVendedor && !perfil.es_fundador && (
+                <div className="absolute bottom-0 w-full bg-cyan-600 text-white text-[10px] font-black text-center py-1 tracking-widest">TIENDA PRO</div>
+              )}
+              {/* 👑 ETIQUETA INFERIOR FUNDADOR */}
+              {perfil.es_fundador && (
+                <div className="absolute bottom-0 w-full bg-gradient-to-r from-amber-600 to-yellow-500 text-white text-[10px] font-black text-center py-1 tracking-widest">FUNDADOR</div>
               )}
             </div>
 
-            {/* 🧠 INSIGNIA DE NIVEL DINÁMICA */}
             <div className={`inline-flex items-center justify-center gap-1.5 ${infoNivel.bg} ${infoNivel.text} px-4 py-1.5 rounded-full border ${infoNivel.border} ${infoNivel.shadow} shadow-lg w-fit -mt-2 z-10`}>
               <span className="text-sm">{infoNivel.icon}</span>
               <span className="text-[10px] font-black tracking-widest uppercase">Nvl {infoNivel.nivel}: {infoNivel.titulo}</span>
             </div>
 
-            {/* 🧠 ESTRELLITAS DE REPUTACIÓN EN CABECERA */}
             {esVendedor && (
               <div className="flex items-center gap-1 text-amber-500 text-sm font-black -mt-2 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full shadow-sm">
                 <FaStar /> {promedioEstrellas} <span className="text-amber-700/60 text-[10px] ml-1">({totalReseñas})</span>
@@ -221,16 +225,22 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
 
           {/* Info Principal */}
           <div className="flex-1 text-center md:text-left flex flex-col justify-center">
-            <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-1 flex items-center justify-center md:justify-start gap-2">
+            <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-1 flex flex-wrap items-center justify-center md:justify-start gap-2">
               {perfil.nombre_usuario}
-              {esVendedor && <svg className="w-6 h-6 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>}
+              {esVendedor && !perfil.es_fundador && <svg className="w-6 h-6 text-cyan-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>}
+              
+              {/* 👑 INSIGNIA OFICIAL DE FUNDADOR AL LADO DEL NOMBRE */}
+              {perfil.es_fundador && (
+                <span className="bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 text-xs px-3 py-1 rounded-full flex items-center gap-1 shadow-md border border-amber-300 transform -translate-y-1">
+                  <FaCrown className="w-3 h-3" /> MIEMBRO FUNDADOR
+                </span>
+              )}
             </h1>
             
             <p className="text-sm font-bold text-slate-500 mb-3 flex items-center justify-center md:justify-start gap-1">
               📍 {ubicacion}
             </p>
 
-            {/* 👥 NUEVO: Sección de Seguidores */}
             <div className="flex justify-center md:justify-start gap-6 mb-4">
               <div className="text-center">
                 <span className="text-lg font-black text-slate-800 block leading-none">{totalSeguidores}</span>
@@ -242,14 +252,11 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               </div>
             </div>
 
-            {/* 🧠 ACTUALIZADO: MINI LOGROS */}
             {trofeos.length > 0 && (
               <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-4">
                 {trofeos.map((t: any) => (
                   <div key={t.id_logro} className={`w-9 h-9 rounded-full border-2 flex items-center justify-center p-1.5 relative group cursor-help transition-transform hover:scale-110 shadow-sm ${getMiniRarezaColor(t.rareza_logro)}`}>
                     {getIconForAchievement(t)}
-                    
-                    {/* Tooltip */}
                     <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20 whitespace-nowrap bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg">
                       {t.nombre}
                       <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
@@ -259,7 +266,6 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               </div>
             )}
 
-            {/* ESTADÍSTICAS: Piezas y Valor IA */}
             <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-6">
               <div className="bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-center shadow-sm">
                 <p className="text-2xl font-black text-slate-800">{totalAutos}</p>
@@ -272,8 +278,6 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               <div className="bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl text-center shadow-sm relative group cursor-help">
                 <p className="text-2xl font-black text-cyan-700">${valorTotalIA.toLocaleString()}</p>
                 <p className="text-[10px] uppercase font-bold text-cyan-600 flex items-center justify-center gap-1">Valuación IA <span className="bg-cyan-600 text-white text-[8px] px-1 rounded">BETA</span></p>
-                
-                {/* Explicación del Valor IA */}
                 <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20 w-48 text-center bg-slate-900 text-white text-[10px] font-medium px-3 py-2 rounded-lg shadow-xl left-1/2 -translate-x-1/2">
                   Suma del valor estimado de mercado calculado por nuestro algoritmo.
                   <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
@@ -281,7 +285,6 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               </div>
             </div>
 
-            {/* BOTONES DE ACCIÓN (Seguir / Contacto) */}
             <div className="flex flex-wrap justify-center md:justify-start gap-3 w-full">
               {!esMio && miIdUsuario && (
                 <form action="/api/follow" method="POST" className="flex-1 md:flex-none">
@@ -298,8 +301,6 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
                   Editar mi Perfil
                 </Link>
               )}
-
-              {/* Botón Maps Exclusivo */}
               {mostrarContacto && enlaceMaps && (
                 <a href={enlaceMaps} target="_blank" rel="noopener noreferrer" className="px-6 py-3 rounded-xl font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-all shadow-sm flex items-center gap-2">
                   📍 Abrir Maps
@@ -307,7 +308,6 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               )}
             </div>
 
-            {/* Panel de Contacto */}
             {mostrarContacto && (enlaceWhatsApp || enlaceFacebook) && (
               <div className="mt-6 flex flex-wrap justify-center md:justify-start gap-3">
                 {enlaceWhatsApp && <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer" className="text-xs font-bold bg-[#25D366]/10 text-[#1DA851] border border-[#25D366]/30 px-4 py-2 rounded-lg hover:bg-[#25D366]/20 transition-colors flex items-center gap-1">📱 WhatsApp</a>}
@@ -315,7 +315,6 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
               </div>
             )}
             
-            {/* Aviso para Usuarios Normales si no son Mutuos */}
             {!esVendedor && !esMio && !sonMutuos && (
                <p className="text-xs text-amber-600 mt-4 bg-amber-50 py-2 px-4 rounded-lg border border-amber-200 w-fit mx-auto md:mx-0">
                  🔒 Síguelo para desbloquear sus datos de contacto mutuo.
@@ -340,7 +339,10 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
             {carros.map((carro) => (
               <Link key={carro.id_carro} href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200 relative group">
-                {carro.para_venta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">💲 VENTA</div>}
+                {carro.es_lote && <div className="absolute top-2 left-2 z-20 bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">📦 LOTE</div>}
+                {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">💲 VENTA</div>}
+                {carro.es_preventa && <div className="absolute top-2 right-2 z-20 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
+                {carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
                 {!carro.para_venta && carro.para_cambio && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">CAMBIO</div>}
                 
                 <CollectorCard 
@@ -357,7 +359,6 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
           </div>
         )}
         
-        {/* 🧠 AQUÍ INSERTAMOS EL COMPONENTE DE REPUTACIÓN (Solo visible si es Vendedor) */}
         {esVendedor && (
           <SeccionResenas 
             idVendedor={perfil.id_usuario} 
@@ -365,9 +366,7 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
             esVendedor={esMio} 
           />
         )}
-
       </div>
-
     </main>
   );
 }

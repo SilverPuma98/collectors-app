@@ -20,10 +20,10 @@ export default function MarketplacePage() {
   }, []);
 
   const cargarMercado = async () => {
-    // Traemos todos los autos aprobados que estén a la venta o para cambio
+    // 🧠 TRAEMOS TAMBIÉN "es_fundador" DEL USUARIO Y LA BANDERA "es_subasta" DEL CARRO
     const { data } = await supabase
       .from('carro')
-      .select('*, marca(marca), presentacion(presentacion), usuario(nombre_usuario, link_img_perf, rol)')
+      .select('*, marca(marca), presentacion(presentacion), usuario(nombre_usuario, link_img_perf, rol, es_fundador)')
       .eq('estado_aprobacion', 'APROBADO')
       .or('para_venta.eq.true,para_cambio.eq.true')
       .order('id_carro', { ascending: false });
@@ -119,10 +119,11 @@ export default function MarketplacePage() {
                     {p.para_cambio && <span className="bg-emerald-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">Cambio</span>}
                   </div>
 
-                  {/* ⏳ LADO DERECHO: Venta / Preventa */}
+                  {/* ⏳ LADO DERECHO: Venta / Preventa / Subasta */}
                   <div className="absolute top-2 right-2 z-20 flex flex-col gap-1 items-end">
-                    {p.para_venta && !p.es_preventa && <span className="bg-amber-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">En Venta</span>}
+                    {p.para_venta && !p.es_preventa && !p.es_subasta && <span className="bg-amber-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">En Venta</span>}
                     {p.es_preventa && <span className="bg-indigo-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-md uppercase animate-pulse shadow-indigo-500/50">⏳ Preventa</span>}
+                    {p.es_subasta && <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-md uppercase animate-bounce shadow-rose-500/50">🔨 Subasta</span>}
                   </div>
                   
                   <CollectorCard 
@@ -139,13 +140,17 @@ export default function MarketplacePage() {
 
                 {/* Info del Vendedor (Debajo de la tarjeta) */}
                 <Link href={`/perfil/${p.usuario?.nombre_usuario}`} className="mt-3 flex items-center gap-2 px-1 hover:opacity-80 transition-opacity">
-                  <div className={`w-6 h-6 rounded-full bg-slate-800 overflow-hidden shrink-0 border border-slate-700 ${p.usuario?.rol === 'VENDEDOR' ? 'ring-1 ring-amber-500' : ''}`}>
+                  {/* 👑 SI ES FUNDADOR, Borde Dorado, de lo contrario normal */}
+                  <div className={`w-6 h-6 rounded-full overflow-hidden shrink-0 border ${p.usuario?.es_fundador ? 'border-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]' : (p.usuario?.rol === 'VENDEDOR' ? 'border-amber-500' : 'border-slate-700')} bg-slate-800`}>
                     {p.usuario?.link_img_perf ? <img src={p.usuario.link_img_perf} className="w-full h-full object-cover"/> : <svg className="w-full h-full p-1 text-slate-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
                   </div>
                   <div className="truncate">
                     <p className="text-[10px] text-slate-500 font-bold leading-none">Ofrecido por</p>
-                    <p className="text-xs text-slate-300 font-black truncate group-hover:text-cyan-400 transition-colors">
-                      @{p.usuario?.nombre_usuario || 'Anónimo'} {p.usuario?.rol === 'VENDEDOR' && <span className="text-amber-500 ml-0.5">✓</span>}
+                    <p className="text-xs text-slate-300 font-black truncate group-hover:text-cyan-400 transition-colors flex items-center gap-0.5">
+                      @{p.usuario?.nombre_usuario || 'Anónimo'} 
+                      {p.usuario?.rol === 'VENDEDOR' && !p.usuario?.es_fundador && <span className="text-amber-500 ml-0.5">✓</span>}
+                      {/* 👑 CORONA DE FUNDADOR AL LADO DEL NOMBRE */}
+                      {p.usuario?.es_fundador && <span className="text-amber-400 ml-0.5 text-xs drop-shadow-[0_0_2px_rgba(251,191,36,0.8)]">👑</span>}
                     </p>
                   </div>
                 </Link>

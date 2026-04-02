@@ -39,9 +39,10 @@ export default function HomeFeed() {
         }
 
         if (perfil.id_mun) {
+          // 🧠 INCLUIMOS "es_fundador" EN LA CONSULTA DE TIENDAS LOCALES
           const { data: tiendas } = await supabase
             .from('usuario')
-            .select('id_usuario, nombre_usuario, link_img_perf, rol')
+            .select('id_usuario, nombre_usuario, link_img_perf, rol, es_fundador')
             .eq('rol', 'VENDEDOR')
             .eq('id_mun', perfil.id_mun)
             .neq('id_usuario', miId)
@@ -55,9 +56,10 @@ export default function HomeFeed() {
       }
     }
 
+    // 🧠 INCLUIMOS "es_fundador" EN LA CONSULTA DE COCHES
     const { data: coches } = await supabase
       .from('carro')
-      .select(`*, marca(marca), serie(serie), presentacion(presentacion), usuario:id_usuario (nombre_usuario, link_img_perf, rol)`)
+      .select(`*, marca(marca), serie(serie), presentacion(presentacion), usuario:id_usuario (nombre_usuario, link_img_perf, rol, es_fundador)`)
       .eq('estado_aprobacion', 'APROBADO')
       .order('id_carro', { ascending: false })
       .limit(100);
@@ -67,9 +69,8 @@ export default function HomeFeed() {
       const ventasLocales: any[] = [];
       const comunidad: any[] = [];
 
-      // 🧠 CLASIFICAMOS LOS AUTOS
       coches.forEach(carro => {
-        if (carro.id_usuario === miId) return; // No mostrar mis propios autos en el feed
+        if (carro.id_usuario === miId) return; 
         
         if (listaSeguidos.includes(carro.id_usuario)) {
           amigos.push(carro);
@@ -80,22 +81,20 @@ export default function HomeFeed() {
         }
       });
 
-      // 🧠 ALGORITMO DE MEZCLA (Intercalamos Amigos con Ventas Locales)
       let feedConstruido: any[] = [];
       let i = 0, j = 0;
       
       while(i < amigos.length || j < ventasLocales.length) {
         if (i < amigos.length) feedConstruido.push(amigos[i++]);
-        if (i < amigos.length) feedConstruido.push(amigos[i++]); // Ponemos 2 de amigos
+        if (i < amigos.length) feedConstruido.push(amigos[i++]); 
         
         if (j < ventasLocales.length) {
           let venta = ventasLocales[j++];
-          venta.isGolden = true; // 🌟 MARCADOR PARA BORDES DORADOS
+          venta.isGolden = true; 
           feedConstruido.push(venta);
         }
       }
       
-      // Rellenamos el final con piezas del resto de la comunidad
       feedConstruido = [...feedConstruido, ...comunidad];
       setFeedUnificado(feedConstruido);
     }
@@ -117,10 +116,12 @@ export default function HomeFeed() {
 
   const realizarBusqueda = async (texto: string) => {
     setBuscando(true);
-    const resUsu = await supabase.from('usuario').select('id_usuario, nombre_usuario, link_img_perf, rol').ilike('nombre_usuario', `%${texto}%`).limit(10);
+    // 🧠 INCLUIMOS "es_fundador" EN LA BÚSQUEDA DE USUARIOS
+    const resUsu = await supabase.from('usuario').select('id_usuario, nombre_usuario, link_img_perf, rol, es_fundador').ilike('nombre_usuario', `%${texto}%`).limit(10);
     if (resUsu.data) setUsuariosEncontrados(resUsu.data);
 
-    const resCar = await supabase.from('carro').select(`*, marca(marca), serie(serie), presentacion(presentacion), usuario:id_usuario (nombre_usuario, link_img_perf)`).eq('estado_aprobacion', 'APROBADO').or(`modelo.ilike.%${texto}%,rareza.ilike.%${texto}%`).limit(20);
+    // 🧠 INCLUIMOS "es_fundador" EN LA BÚSQUEDA DE COCHES
+    const resCar = await supabase.from('carro').select(`*, marca(marca), serie(serie), presentacion(presentacion), usuario:id_usuario (nombre_usuario, link_img_perf, es_fundador)`).eq('estado_aprobacion', 'APROBADO').or(`modelo.ilike.%${texto}%,rareza.ilike.%${texto}%`).limit(20);
     if (resCar.data) setAutosEncontrados(resCar.data);
     setBuscando(false);
   };
@@ -130,7 +131,6 @@ export default function HomeFeed() {
   return (
     <main className="min-h-screen bg-[#050810] pb-20 font-sans selection:bg-cyan-900 selection:text-cyan-50 relative overflow-hidden">
       
-      {/* 🚀 BARRA DE BÚSQUEDA GLOBAL (Fija y sin traslapes) */}
       <div className="relative z-30 bg-[#050810] px-4 md:px-8 py-6 mb-2">
         <div className="max-w-4xl mx-auto relative flex items-center">
           <div className="absolute left-4 flex items-center justify-center pointer-events-none text-cyan-600">
@@ -153,7 +153,6 @@ export default function HomeFeed() {
 
       <div className="max-w-4xl mx-auto px-4 md:px-8 flex flex-col gap-6 mt-6">
         
-        {/* 🚀 MEGA BOTONES / HERO BANNER */}
         {!miIdUsuario && query.trim().length < 2 ? (
           <section className="bg-gradient-to-br from-cyan-900/40 to-[#0b1120] border border-cyan-800/50 rounded-3xl p-8 md:p-12 text-center relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
@@ -202,10 +201,15 @@ export default function HomeFeed() {
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
               {tiendasLocales.map(tienda => (
                 <Link key={tienda.id_usuario} href={`/perfil/${tienda.nombre_usuario}`} className="flex flex-col items-center gap-2 min-w-[72px] group snap-start">
-                  <div className="w-16 h-16 rounded-full border-2 border-amber-500 group-hover:border-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.2)] overflow-hidden bg-slate-800 transition-all relative shrink-0">
+                  {/* 👑 BORDE DORADO SI ES FUNDADOR */}
+                  <div className={`w-16 h-16 rounded-full border-2 ${tienda.es_fundador ? 'border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.3)]' : 'border-amber-600'} group-hover:border-amber-300 overflow-hidden bg-slate-800 transition-all relative shrink-0`}>
                     {tienda.link_img_perf ? <img src={tienda.link_img_perf} alt="Tienda" className="w-full h-full object-cover" /> : <svg className="w-full h-full text-slate-500 p-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
                   </div>
-                  <span className="text-[10px] text-amber-400 font-bold truncate w-full text-center group-hover:text-amber-300 transition-colors">{tienda.nombre_usuario}</span>
+                  <span className="text-[10px] text-amber-400 font-bold truncate w-full text-center group-hover:text-amber-300 transition-colors flex items-center justify-center gap-0.5">
+                    {tienda.nombre_usuario}
+                    {/* 👑 CORONITA */}
+                    {tienda.es_fundador && <span className="text-amber-400 text-[8px]">👑</span>}
+                  </span>
                 </Link>
               ))}
             </div>
@@ -221,11 +225,16 @@ export default function HomeFeed() {
                 <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                   {usuariosEncontrados.map(user => (
                     <Link key={user.id_usuario} href={`/perfil/${user.nombre_usuario}`} className="flex flex-col items-center gap-2 min-w-[90px] group">
-                      <div className={`w-16 h-16 rounded-full border-2 overflow-hidden bg-slate-800 transition-colors relative ${user.rol === 'VENDEDOR' ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'border-slate-700 group-hover:border-cyan-500'}`}>
+                      {/* 👑 BORDE DORADO SI ES FUNDADOR */}
+                      <div className={`w-16 h-16 rounded-full border-2 overflow-hidden bg-slate-800 transition-colors relative ${user.es_fundador ? 'border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)]' : (user.rol === 'VENDEDOR' ? 'border-amber-600' : 'border-slate-700 group-hover:border-cyan-500')}`}>
                         {user.link_img_perf ? <img src={user.link_img_perf} alt="Avatar" className="w-full h-full object-cover" /> : <svg className="w-full h-full text-slate-500 p-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
                         {user.rol !== 'USUARIO' && <div className="absolute bottom-0 w-full bg-amber-500 text-white text-[8px] font-black text-center py-0.5 leading-none">{user.rol === 'VENDEDOR' ? 'PRO' : 'ADMIN'}</div>}
                       </div>
-                      <span className={`text-xs font-bold truncate w-full text-center transition-colors ${user.rol === 'VENDEDOR' ? 'text-amber-400' : 'text-white group-hover:text-cyan-400'}`}>{user.nombre_usuario}</span>
+                      <span className={`text-xs font-bold truncate w-full text-center transition-colors flex justify-center items-center gap-0.5 ${user.rol === 'VENDEDOR' ? 'text-amber-400' : 'text-white group-hover:text-cyan-400'}`}>
+                        {user.nombre_usuario}
+                        {/* 👑 CORONITA */}
+                        {user.es_fundador && <span className="text-amber-400 text-[10px]">👑</span>}
+                      </span>
                     </Link>
                   ))}
                 </div>
@@ -239,14 +248,21 @@ export default function HomeFeed() {
                   {autosEncontrados.map(carro => (
                     <article key={carro.id_carro} className="bg-[#0b1120] border border-slate-800 rounded-2xl p-3 shadow-lg hover:border-slate-700 transition-colors relative group">
                       
-                      {carro.para_venta && <div className="absolute top-4 right-4 z-20 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">💲 VENTA</div>}
+                      {carro.es_lote && <div className="absolute top-4 right-4 z-20 bg-purple-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">📦 LOTE</div>}
+                      {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">💲 VENTA</div>}
+                      {carro.es_preventa && <div className="absolute top-4 right-4 z-20 bg-indigo-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
+                      {carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
                       {!carro.para_venta && carro.para_cambio && <div className="absolute top-4 left-4 z-20 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">CAMBIO</div>}
 
                       <div className="flex items-center gap-2 mb-3">
-                        <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="w-6 h-6 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 border border-slate-600">
+                        <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className={`w-6 h-6 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 border ${carro.usuario?.es_fundador ? 'border-amber-400' : 'border-slate-600'}`}>
                           {carro.usuario?.link_img_perf ? <img src={carro.usuario.link_img_perf} alt="Avatar" className="w-full h-full object-cover" /> : <svg className="w-full h-full text-slate-500 p-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
                         </Link>
-                        <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="text-[10px] font-bold text-slate-300 hover:text-white transition-colors truncate">De {carro.usuario?.nombre_usuario || "Anónimo"}</Link>
+                        <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="text-[10px] font-bold text-slate-300 hover:text-white transition-colors truncate flex items-center gap-0.5">
+                          De {carro.usuario?.nombre_usuario || "Anónimo"}
+                          {/* 👑 CORONITA */}
+                          {carro.usuario?.es_fundador && <span className="text-amber-400">👑</span>}
+                        </Link>
                       </div>
                       <Link href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200">
                         <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} presentacion={carro.presentacion?.presentacion} valor={carro.valor} valorCalculado={carro.valor_calculado} imagenUrl={carro.imagen_url} />
@@ -281,24 +297,30 @@ export default function HomeFeed() {
                       className={`bg-[#0b1120] border rounded-2xl p-3 transition-colors group relative shadow-lg ${carro.isGolden ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'border-slate-800 hover:border-slate-700'}`}
                     >
                       
-                      {/* 🌟 ETIQUETA DORADA PARA VENTAS LOCALES */}
                       {carro.isGolden && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-600 to-yellow-500 text-slate-900 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-md z-30 whitespace-nowrap">
                           🔥 Venta Local
                         </div>
                       )}
 
-                      {!carro.isGolden && carro.para_venta && <div className="absolute top-4 right-4 z-20 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">💲 VENTA</div>}
+                      {/* 📦⏳🔨 ETIQUETAS PRO EN EL FEED */}
+                      {carro.es_lote && <div className="absolute top-4 left-4 z-20 bg-purple-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">📦 LOTE</div>}
+                      {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">💲 VENTA</div>}
+                      {carro.es_preventa && <div className="absolute top-4 right-4 z-20 bg-indigo-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
+                      {carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
                       {!carro.para_venta && carro.para_cambio && <div className="absolute top-4 right-4 z-20 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">CAMBIO</div>}
 
                       <div className="flex items-center gap-2 mb-3 mt-1">
-                        <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className={`w-6 h-6 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 border ${carro.usuario?.rol === 'VENDEDOR' ? 'border-amber-500' : 'border-slate-600'}`}>
+                        {/* 👑 BORDE DORADO SI ES FUNDADOR */}
+                        <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className={`w-6 h-6 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 border ${carro.usuario?.es_fundador ? 'border-amber-400' : (carro.usuario?.rol === 'VENDEDOR' ? 'border-amber-600' : 'border-slate-600')}`}>
                           {carro.usuario?.link_img_perf ? <img src={carro.usuario.link_img_perf} alt="Avatar" className="w-full h-full object-cover" /> : <svg className="w-full h-full text-slate-500 p-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
                         </Link>
                         <div className="overflow-hidden">
                           <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="text-[10px] font-bold text-slate-300 hover:text-white transition-colors truncate flex items-center gap-1">
                             {carro.usuario?.nombre_usuario || "Anónimo"}
-                            {carro.usuario?.rol === 'VENDEDOR' && <svg className="w-2.5 h-2.5 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>}
+                            {carro.usuario?.rol === 'VENDEDOR' && !carro.usuario?.es_fundador && <svg className="w-2.5 h-2.5 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>}
+                            {/* 👑 CORONITA */}
+                            {carro.usuario?.es_fundador && <span className="text-amber-400 text-[10px]">👑</span>}
                           </Link>
                         </div>
                       </div>
