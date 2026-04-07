@@ -1071,12 +1071,23 @@ export default function MiPanelUsuario() {
                     )}
                   </div>
                 ) : (
-                  <div className={`mt-2 border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${nuevoCarro.para_cambio ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`} onClick={() => setNuevoCarro({...nuevoCarro, para_cambio: !nuevoCarro.para_cambio})}>
-                    <div>
-                      <p className={`text-sm font-bold flex items-center gap-2 ${nuevoCarro.para_cambio ? 'text-emerald-700' : 'text-slate-600'}`}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg> Disponible para Intercambio</p>
-                      <p className="text-xs text-slate-500 mt-1">Actívalo si quieres recibir ofertas de otros usuarios.</p>
+                  <div className="space-y-4 mt-2">
+                    <div className={`border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${nuevoCarro.para_cambio ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`} onClick={() => setNuevoCarro({...nuevoCarro, para_cambio: !nuevoCarro.para_cambio})}>
+                      <div>
+                        <p className={`text-sm font-bold flex items-center gap-2 ${nuevoCarro.para_cambio ? 'text-emerald-700' : 'text-slate-600'}`}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg> Disponible para Intercambio</p>
+                        <p className="text-xs text-slate-500 mt-1">Actívalo si quieres recibir ofertas de otros usuarios.</p>
+                      </div>
+                      <div className={`w-12 h-6 rounded-full flex items-center transition-colors px-1 ${nuevoCarro.para_cambio ? 'bg-emerald-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${nuevoCarro.para_cambio ? 'translate-x-6' : 'translate-x-0'}`}></div></div>
                     </div>
-                    <div className={`w-12 h-6 rounded-full flex items-center transition-colors px-1 ${nuevoCarro.para_cambio ? 'bg-emerald-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${nuevoCarro.para_cambio ? 'translate-x-6' : 'translate-x-0'}`}></div></div>
+
+                    {/* ✨ ESTE ES EL CAMPO QUE FALTABA PARA LOS USUARIOS NORMALES ✨ */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                      <div className="flex justify-between items-end mb-1">
+                        <label className="text-xs text-slate-500 font-bold uppercase tracking-wider block">Valor de la Pieza ($)</label>
+                        {!cocheEditando && nuevoCarro.modelo && !nuevoCarro.es_lote && <span className="text-[9px] bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-bold">IA Automática 🤖</span>}
+                      </div>
+                      <input type="number" step="0.01" placeholder="0.00" value={nuevoCarro.valor} onChange={(e) => setNuevoCarro({...nuevoCarro, valor: e.target.value})} className="w-full bg-white border border-slate-300 text-emerald-600 font-black rounded-lg px-4 py-3 outline-none focus:border-cyan-500 shadow-sm" />
+                    </div>
                   </div>
                 )}
 
