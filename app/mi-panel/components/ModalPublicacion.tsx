@@ -50,6 +50,9 @@ export default function ModalPublicacion({
   const opcionesEstado = estadosCarro.map((e: any) => ({ id: e.id_estado_carro.toString(), label: e.estado_carro }));
   const opcionesEscala = escalas.map((e: any) => ({ id: e.id_escala.toString(), label: e.escala }));
 
+  // Determinar si el usuario tiene privilegios de edición maestra
+  const esUsuarioVIP = miPerfil?.rol === 'SUPER_ADMIN' || miPerfil?.rol === 'VENDEDOR'; // Asumo que Vendedor = Colaborador
+
   const crearSiEsNuevo = async (tabla: string, columna: string, idSeleccionado: string, valorNuevo: string, extraData: any = {}) => {
     if (idSeleccionado !== "nuevo") return parseInt(idSeleccionado) || null;
     if (!valorNuevo) return null;
@@ -124,11 +127,19 @@ export default function ModalPublicacion({
       }
     }
 
+    // 🛡️ CREACIÓN DE DATOS MAESTROS
     const finalIdFab = await crearSiEsNuevo('fabricante', 'fabricante', nuevoCarro.id_fabricante, nuevoCarro.otro_fabricante);
     const finalIdMar = await crearSiEsNuevo('marca', 'marca', nuevoCarro.id_marca, nuevoCarro.otra_marca);
-    const finalIdSer = await crearSiEsNuevo('serie', 'serie', nuevoCarro.id_serie, nuevoCarro.otra_serie, { id_fabricante: finalIdFab, anio: parseInt(nuevoCarro.anio_serie) || null, no_carros: parseInt(nuevoCarro.total_carros) || null });
     
-    if (finalIdSer && nuevoCarro.id_serie !== "nuevo") {
+    // Al crear una serie nueva, le pasamos los datos. Si ya existe, NO se sobrescribe aquí.
+    const finalIdSer = await crearSiEsNuevo('serie', 'serie', nuevoCarro.id_serie, nuevoCarro.otra_serie, { 
+      id_fabricante: finalIdFab, 
+      anio: parseInt(nuevoCarro.anio_serie) || null, 
+      no_carros: parseInt(nuevoCarro.total_carros) || null 
+    });
+    
+    // 🛡️ REGLA DE NEGOCIO: Solo SuperAdmins/Vendedores pueden editar series ya existentes
+    if (finalIdSer && nuevoCarro.id_serie !== "nuevo" && esUsuarioVIP) {
       await supabase.from('serie').update({
         anio: parseInt(nuevoCarro.anio_serie) || null,
         no_carros: parseInt(nuevoCarro.total_carros) || null,
@@ -136,25 +147,40 @@ export default function ModalPublicacion({
       }).eq('id_serie', finalIdSer);
     }
 
+    // Creación de Rarezas y Presentaciones Nuevas (Permitido para todos)
+    const finalIdRareza = await crearSiEsNuevo('rareza', 'rareza', nuevoCarro.rareza, nuevoCarro.rareza, { id_fabricante: finalIdFab });
     const finalIdPres = await crearSiEsNuevo('presentacion', 'presentacion', nuevoCarro.id_presentacion, nuevoCarro.otra_presentacion, { id_fabricante: finalIdFab });
 
     const finalAnio = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
     const nombreEst = estadosCarro.find((e: any) => e.id_estado_carro.toString() === nuevoCarro.id_estado_carro)?.estado_carro || "";
     const nombreFab = fabricantes.find((f: any) => f.id_fabricante.toString() === nuevoCarro.id_fabricante)?.fabricante || nuevoCarro.otro_fabricante;
-    const nombreRareza = rarezas.find((r: any) => r.id_rareza.toString() === nuevoCarro.rareza)?.rareza || nuevoCarro.rareza;
-    const nombrePres = presentaciones.find((p: any) => p.id_presentacion.toString() === nuevoCarro.id_presentacion)?.presentacion || nuevoCarro.otra_presentacion || "Individual Básico";
     
-    const sugeridoIA = nuevoCarro.es_lote ? 0 : calcularValorAproximado(nuevoCarro.modelo, nombreFab, nombreRareza, nombrePres, finalAnio, nombreEst);
+    // Obtenemos los nombres (strings) para la tabla carro
+    const { data: rarData } = finalIdRareza ? await supabase.from('rareza').select('rareza').eq('id_rareza', finalIdRareza).single() : { data: { rareza: nuevoCarro.rareza } };
+    const nombreRarezaFinal = rarData?.rareza || nuevoCarro.rareza;
+
+    const { data: presData } = finalIdPres ? await supabase.from('presentacion').select('presentacion').eq('id_presentacion', finalIdPres).single() : { data: { presentacion: "Individual Básico" } };
+    const nombrePresFinal = presData?.presentacion || "Individual Básico";
+    
+    const sugeridoIA = nuevoCarro.es_lote ? 0 : calcularValorAproximado(nuevoCarro.modelo, nombreFab, nombreRarezaFinal, nombrePresFinal, finalAnio, nombreEst);
 
     const payload: any = {
-      modelo: nuevoCarro.modelo, id_fabricante: finalIdFab, marca: finalIdMar, serie: finalIdSer,  
-      rareza: nombreRareza, 
+      modelo: nuevoCarro.modelo, 
+      id_fabricante: finalIdFab, 
+      marca: finalIdMar, 
+      serie: finalIdSer,  
+      rareza: nombreRarezaFinal, 
       id_presentacion: finalIdPres || null, 
       valor: parseFloat(nuevoCarro.valor) || 0,
       valor_calculado: sugeridoIA,
-      escala: parseInt(nuevoCarro.id_escala) || null, estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, no_carro: parseInt(nuevoCarro.no_carro) || null, 
-      para_cambio: nuevoCarro.para_cambio, para_venta: nuevoCarro.para_venta,
-      es_lote: nuevoCarro.es_lote, es_preventa: nuevoCarro.es_preventa, fecha_llegada: nuevoCarro.es_preventa ? (nuevoCarro.fecha_llegada || null) : null,
+      escala: parseInt(nuevoCarro.id_escala) || null, 
+      estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, 
+      no_carro: parseInt(nuevoCarro.no_carro) || null, 
+      para_cambio: nuevoCarro.para_cambio, 
+      para_venta: nuevoCarro.para_venta,
+      es_lote: nuevoCarro.es_lote, 
+      es_preventa: nuevoCarro.es_preventa, 
+      fecha_llegada: nuevoCarro.es_preventa ? (nuevoCarro.fecha_llegada || null) : null,
       galeria: nuevoCarro.es_lote ? urlsExtraFinales : [],
       es_subasta: nuevoCarro.es_subasta 
     };
@@ -210,6 +236,12 @@ export default function ModalPublicacion({
       alert("¡Publicación actualizada exitosamente!");
     }
   };
+
+  // 🛡️ LÓGICA DE AUTOCOMPLETADO Y BLOQUEO DE SERIES
+  // Detecta si la serie seleccionada ya tiene Año o Total, y bloquea esos campos si no eres VIP
+  const serieSeleccionadaObj = series.find((s: any) => s.id_serie === parseInt(nuevoCarro.id_serie));
+  const serieTieneAnio = serieSeleccionadaObj && serieSeleccionadaObj.anio !== null;
+  const serieTieneTotal = serieSeleccionadaObj && serieSeleccionadaObj.no_carros !== null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200 overflow-y-auto pt-10 pb-10">
@@ -280,11 +312,11 @@ export default function ModalPublicacion({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="z-[35]">
                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Fabricante *</label>
-                <BuscadorDesplegable opciones={opcionesFabricante} valorSeleccionado={nuevoCarro.id_fabricante} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_fabricante: id, otro_fabricante: text})} placeholder="Buscar o crear..." />
+                <BuscadorDesplegable opciones={opcionesFabricante} valorSeleccionado={nuevoCarro.id_fabricante} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_fabricante: id, otro_fabricante: text})} placeholder="Buscar o crear..." permiteNuevo={true} />
               </div>
               <div className="z-[34]">
                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Marca de Auto *</label>
-                <BuscadorDesplegable opciones={opcionesMarca} valorSeleccionado={nuevoCarro.id_marca} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_marca: id, otra_marca: text})} placeholder="Buscar o crear..." />
+                <BuscadorDesplegable opciones={opcionesMarca} valorSeleccionado={nuevoCarro.id_marca} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_marca: id, otra_marca: text})} placeholder="Buscar o crear..." permiteNuevo={true} />
               </div>
             </div>
 
@@ -295,23 +327,36 @@ export default function ModalPublicacion({
               </div>
               <div className="z-[32]">
                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block flex items-center gap-1">💎 Nivel de Rareza</label>
-                <BuscadorDesplegable opciones={opcionesRareza} valorSeleccionado={nuevoCarro.rareza} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, rareza: id})} placeholder="Variante (TH, Chase...)" disabled={!idFabAct} permiteNuevo={false} />
+                {/* AQUI LOS USUARIOS SI PUEDEN CREAR NUEVAS RAREZAS */}
+                <BuscadorDesplegable opciones={opcionesRareza} valorSeleccionado={nuevoCarro.rareza} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, rareza: id === 'nuevo' ? text : id})} placeholder="Variante (TH, Chase...)" disabled={!idFabAct} permiteNuevo={true} />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
               <div className="sm:col-span-5 z-[31]">
                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Serie (Filtrada)</label>
-                <BuscadorDesplegable opciones={opcionesSerie} valorSeleccionado={nuevoCarro.id_serie} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_serie: id, otra_serie: text})} placeholder="Ej. Exotics" disabled={!idFabAct && nuevoCarro.id_fabricante !== 'nuevo'} />
+                {/* AQUI LOS USUARIOS SI PUEDEN CREAR NUEVAS SERIES */}
+                <BuscadorDesplegable opciones={opcionesSerie} valorSeleccionado={nuevoCarro.id_serie} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_serie: id, otra_serie: text})} placeholder="Ej. Exotics" disabled={!idFabAct && nuevoCarro.id_fabricante !== 'nuevo'} permiteNuevo={true} />
               </div>
               <div className="sm:col-span-3 flex gap-2 z-[30]">
-                <div className="w-1/2"><label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">No.</label><input type="number" placeholder="3" value={nuevoCarro.no_carro} onChange={(e) => setNuevoCarro({...nuevoCarro, no_carro: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center shadow-sm" /></div>
+                <div className="w-1/2">
+                  <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">No.</label>
+                  <input type="number" placeholder="3" value={nuevoCarro.no_carro} onChange={(e) => setNuevoCarro({...nuevoCarro, no_carro: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center shadow-sm" />
+                </div>
                 <div className="flex items-center pt-5 text-slate-400 font-bold">/</div>
-                <div className="w-1/2"><label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Total</label><input type="number" placeholder="10" disabled={nuevoCarro.id_serie !== 'nuevo' && nuevoCarro.total_carros !== ""} value={nuevoCarro.total_carros} onChange={(e) => setNuevoCarro({...nuevoCarro, total_carros: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center disabled:bg-slate-100 disabled:text-slate-400 shadow-sm" /></div>
+                <div className="w-1/2">
+                  <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Total</label>
+                  {/* 🛡️ BLOQUEO CONDICIONAL: Si ya tiene total y no eres VIP, se bloquea */}
+                  <input type="number" placeholder="10" disabled={(nuevoCarro.id_serie !== 'nuevo' && serieTieneTotal) && !esUsuarioVIP} value={nuevoCarro.total_carros} onChange={(e) => setNuevoCarro({...nuevoCarro, total_carros: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center disabled:bg-slate-100 disabled:text-slate-400 shadow-sm" title={(!esUsuarioVIP && serieTieneTotal) ? "Dato Maestro: Solo Colaboradores pueden editarlo" : ""} />
+                </div>
               </div>
               <div className="sm:col-span-4 z-[29]">
                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Año</label>
-                <select disabled={nuevoCarro.id_serie !== 'nuevo' && nuevoCarro.anio_serie !== ""} value={nuevoCarro.anio_serie} onChange={(e) => setNuevoCarro({...nuevoCarro, anio_serie: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-3 py-3 outline-none disabled:bg-slate-100 cursor-pointer shadow-sm"><option value="">-- Seleccionar --</option>{aniosDisponibles.map((anio: number) => <option key={anio} value={anio}>{anio}</option>)}</select>
+                {/* 🛡️ BLOQUEO CONDICIONAL: Si ya tiene año y no eres VIP, se bloquea */}
+                <select disabled={(nuevoCarro.id_serie !== 'nuevo' && serieTieneAnio) && !esUsuarioVIP} value={nuevoCarro.anio_serie} onChange={(e) => setNuevoCarro({...nuevoCarro, anio_serie: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-3 py-3 outline-none disabled:bg-slate-100 cursor-pointer shadow-sm" title={(!esUsuarioVIP && serieTieneAnio) ? "Dato Maestro: Solo Colaboradores pueden editarlo" : ""}>
+                  <option value="">-- Seleccionar --</option>
+                  {aniosDisponibles.map((anio: number) => <option key={anio} value={anio}>{anio}</option>)}
+                </select>
               </div>
             </div>
 
@@ -330,7 +375,6 @@ export default function ModalPublicacion({
             {miPerfil?.rol === 'VENDEDOR' || miPerfil?.rol === 'SUPER_ADMIN' ? (
               <div className="space-y-2 mt-2">
                 
-                {/* Botón Maestro de Venta */}
                 <div className={`border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${nuevoCarro.para_venta ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`} onClick={() => setNuevoCarro({...nuevoCarro, para_venta: !nuevoCarro.para_venta, para_cambio: false, es_subasta: false, es_preventa: false})}>
                   <div>
                     <p className={`text-sm font-bold flex items-center gap-2 ${nuevoCarro.para_venta ? 'text-amber-700' : 'text-slate-600'}`}>💲 En Venta</p>
@@ -342,7 +386,6 @@ export default function ModalPublicacion({
                 {nuevoCarro.para_venta && (
                   <div className="pl-4 border-l-2 border-slate-200 space-y-2 ml-4">
                     
-                    {/* 🔨 INTERRUPTOR DE SUBASTA */}
                     <div className={`border p-4 rounded-xl flex flex-col gap-3 transition-colors ${nuevoCarro.es_subasta ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
                       <div className="flex items-center justify-between cursor-pointer" onClick={() => setNuevoCarro({...nuevoCarro, es_subasta: !nuevoCarro.es_subasta, es_preventa: false, es_lote: false})}>
                         <div>
@@ -372,7 +415,6 @@ export default function ModalPublicacion({
                       )}
                     </div>
 
-                    {/* ⏳ INTERRUPTOR DE PREVENTA (Oculto si es Subasta) */}
                     {!nuevoCarro.es_subasta && (
                       <div className={`border p-4 rounded-xl flex flex-col gap-3 transition-colors ${nuevoCarro.es_preventa ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'}`}>
                         <div className="flex items-center justify-between cursor-pointer" onClick={() => setNuevoCarro({...nuevoCarro, es_preventa: !nuevoCarro.es_preventa})}>
@@ -391,7 +433,6 @@ export default function ModalPublicacion({
                       </div>
                     )}
                     
-                    {/* 💲 VALOR DIRECTO (Oculto si es Subasta) */}
                     {!nuevoCarro.es_subasta && (
                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                           <div className="flex justify-between items-end mb-1">
