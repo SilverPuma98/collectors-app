@@ -6,12 +6,21 @@ export function calcularValorAproximado(
   rareza: string,
   presentacion: string, // 📦 El 6to argumento
   anio: number | null,
-  nombreEstado: string
+  nombreEstado: string,
+  // ✨ NUEVO PARÁMETRO: Datos custom sandbox (7mo argumento opcional)
+  customData?: { valor_base: string | number, costo_materiales: string | number }
 ): number {
   
   // 🛑 CANDADO DE SEGURIDAD: Si no hay modelo escrito, el valor es 0.
   if (!modelo || modelo.trim() === "") {
     return 0;
+  }
+
+  // 🛡️ REGLA SANDBOX: Si es una pieza custom, el valor sugerido es = Valor Base + Materiales
+  if (customData) {
+    const base = parseFloat(customData.valor_base.toString()) || 0;
+    const materiales = parseFloat(customData.costo_materiales.toString()) || 0;
+    return base + materiales;
   }
 
   // 1. Precio Retail Base (P_retail) y Factor de Marca (B) en Pesos MXN
@@ -60,7 +69,7 @@ export function calcularValorAproximado(
   // Nivel Dios (RLC, Convenciones limitadas)
   if (rar.includes('rlc') || rar.includes('red line club') || rar.includes('convention')) Q = 25.0;
   // Nivel Leyenda (STH de Hot Wheels)
-  else if (rar.includes('super treasure') || rar.includes('sth')) Q = 15.0;
+  else if (rar.includes('super treasure') || rar.includes('sth') || rar.includes('súper treasure')) Q = 15.0;
   // Nivel Raw / Súper Chase (Piezas sin pintar de M2, Chase 1/1 de Kaido)
   else if (rar.includes('raw') || rar.includes('super chase')) Q = 12.0;
   // Nivel Chase General (M2 Gold/Black, Matchbox Super Chase, Mini GT, White Lightning)

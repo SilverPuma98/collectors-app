@@ -19,11 +19,18 @@ export default function TabBoveda({
   const carrosFiltrados = misCarros.filter(carro => {
     if (!busqueda) return true;
     const termino = busqueda.toLowerCase();
+    
+    // Leemos datos maestros o los datos del sandbox si es custom
+    const datosCustom = carro.carro_custom?.[0] || {};
+    const nombreMarca = carro.es_custom && datosCustom.marca ? datosCustom.marca : carro.marca?.marca;
+    const nombreSerie = carro.es_custom && datosCustom.serie ? datosCustom.serie : carro.serie?.serie;
+    const nombreFabricante = carro.es_custom && datosCustom.fabricante ? datosCustom.fabricante : carro.fabricante?.fabricante;
+    
     return carro.modelo?.toLowerCase().includes(termino) || 
-           carro.marca?.marca?.toLowerCase().includes(termino) || 
-           carro.serie?.serie?.toLowerCase().includes(termino) || 
+           nombreMarca?.toLowerCase().includes(termino) || 
+           nombreSerie?.toLowerCase().includes(termino) || 
            carro.rareza?.toLowerCase().includes(termino) || 
-           carro.fabricante?.fabricante?.toLowerCase().includes(termino);
+           nombreFabricante?.toLowerCase().includes(termino);
   });
 
   return (
@@ -44,38 +51,48 @@ export default function TabBoveda({
         <div className="text-center py-20 bg-slate-50 border border-slate-200 border-dashed rounded-2xl"><p className="text-slate-500 font-medium">Aún no hay joyas en tu bóveda.</p></div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-          {carrosFiltrados.map((carro) => (
-            <div 
-              key={carro.id_carro} 
-              className="relative group cursor-pointer"
-              onClick={() => setTarjetaActiva(tarjetaActiva === carro.id_carro ? null : carro.id_carro)}
-            >
-              {carro.estado_aprobacion === 'PENDIENTE' && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">REVISIÓN</div>}
-              {carro.para_cambio && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">CAMBIO</div>}
-              {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">💲 EN VENTA</div>}
-              
-              {carro.es_preventa && <div className="absolute top-2 right-2 z-20 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
-              {carro.es_lote && <div className="absolute top-2 left-2 z-20 bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">📦 LOTE</div>}
-              
-              {carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
-              
-              <div className={`absolute inset-0 bg-slate-900/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2 transition-opacity duration-300 rounded-2xl p-2 ${tarjetaActiva === carro.id_carro ? 'opacity-100' : 'opacity-0 lg:group-hover:opacity-100'}`}>
-                <button onClick={(e) => { e.stopPropagation(); abrirModalCarro(carro); }} className="w-full max-w-[120px] bg-white text-slate-800 py-2 rounded-lg shadow-lg font-bold text-xs hover:bg-slate-200 transition-transform active:scale-95">Editar</button>
-                <button onClick={(e) => { e.stopPropagation(); eliminarCarro(carro.id_carro); }} className="w-full max-w-[120px] bg-red-500 text-white py-2 rounded-lg shadow-lg font-bold text-xs hover:bg-red-400 transition-transform active:scale-95">Eliminar</button>
-                <Link href={`/pieza/${carro.id_carro}`} onClick={(e) => e.stopPropagation()} className="w-full max-w-[120px] bg-cyan-600 text-white py-2 rounded-lg shadow-lg font-bold text-xs text-center hover:bg-cyan-500 mt-2 transition-transform active:scale-95">Detalles</Link>
+          {carrosFiltrados.map((carro) => {
+            // ✨ Extracción inteligente de nombres (Maestros vs Custom Sandbox)
+            const datosCustom = carro.carro_custom?.[0] || {};
+            const nombreMarca = carro.es_custom && datosCustom.marca ? datosCustom.marca : (carro.marca?.marca || "Sin Marca");
+            const nombrePres = carro.es_custom && datosCustom.presentacion ? datosCustom.presentacion : carro.presentacion?.presentacion;
+            const nombreRareza = carro.es_custom && datosCustom.rareza ? datosCustom.rareza : (carro.rareza || "Común");
+            
+            return (
+              <div 
+                key={carro.id_carro} 
+                className="relative group cursor-pointer"
+                onClick={() => setTarjetaActiva(tarjetaActiva === carro.id_carro ? null : carro.id_carro)}
+              >
+                {carro.estado_aprobacion === 'PENDIENTE' && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">REVISIÓN</div>}
+                
+                {carro.para_cambio && !carro.es_custom && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">CAMBIO</div>}
+                {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">💲 EN VENTA</div>}
+                
+                {carro.es_preventa && <div className="absolute top-2 right-2 z-20 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
+                {carro.es_lote && !carro.es_custom && <div className="absolute top-2 left-2 z-20 bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">📦 LOTE</div>}
+                
+                {carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
+                
+                <div className={`absolute inset-0 bg-slate-900/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2 transition-opacity duration-300 rounded-2xl p-2 ${tarjetaActiva === carro.id_carro ? 'opacity-100' : 'opacity-0 lg:group-hover:opacity-100'}`}>
+                  <button onClick={(e) => { e.stopPropagation(); abrirModalCarro(carro); }} className="w-full max-w-[120px] bg-white text-slate-800 py-2 rounded-lg shadow-lg font-bold text-xs hover:bg-slate-200 transition-transform active:scale-95">Editar</button>
+                  <button onClick={(e) => { e.stopPropagation(); eliminarCarro(carro.id_carro); }} className="w-full max-w-[120px] bg-red-500 text-white py-2 rounded-lg shadow-lg font-bold text-xs hover:bg-red-400 transition-transform active:scale-95">Eliminar</button>
+                  <Link href={`/pieza/${carro.id_carro}`} onClick={(e) => e.stopPropagation()} className="w-full max-w-[120px] bg-cyan-600 text-white py-2 rounded-lg shadow-lg font-bold text-xs text-center hover:bg-cyan-500 mt-2 transition-transform active:scale-95">Detalles</Link>
+                </div>
+                
+                <CollectorCard 
+                  modelo={carro.modelo} 
+                  marca={nombreMarca} 
+                  rareza={nombreRareza} 
+                  presentacion={nombrePres}
+                  valor={carro.valor} 
+                  valorCalculado={carro.valor_calculado} 
+                  imagenUrl={carro.imagen_url} 
+                  esCustom={carro.es_custom} // ✨ Pasamos la bandera a la tarjeta visual
+                />
               </div>
-              
-              <CollectorCard 
-                modelo={carro.modelo} 
-                marca={carro.marca?.marca || "Sin Marca"} 
-                rareza={carro.rareza || "Común"} 
-                presentacion={carro.presentacion?.presentacion}
-                valor={carro.valor} 
-                valorCalculado={carro.valor_calculado} 
-                imagenUrl={carro.imagen_url} 
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

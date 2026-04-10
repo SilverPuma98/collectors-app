@@ -50,8 +50,7 @@ export default function ModalPublicacion({
   const opcionesEstado = estadosCarro.map((e: any) => ({ id: e.id_estado_carro.toString(), label: e.estado_carro }));
   const opcionesEscala = escalas.map((e: any) => ({ id: e.id_escala.toString(), label: e.escala }));
 
-  // Determinar si el usuario tiene privilegios de edición maestra
-  const esUsuarioVIP = miPerfil?.rol === 'SUPER_ADMIN' || miPerfil?.rol === 'VENDEDOR'; // Asumo que Vendedor = Colaborador
+  const esUsuarioVIP = miPerfil?.rol === 'SUPER_ADMIN' || miPerfil?.rol === 'VENDEDOR'; 
 
   const crearSiEsNuevo = async (tabla: string, columna: string, idSeleccionado: string, valorNuevo: string, extraData: any = {}) => {
     if (idSeleccionado !== "nuevo") return parseInt(idSeleccionado) || null;
@@ -127,67 +126,68 @@ export default function ModalPublicacion({
       }
     }
 
-    // 🛡️ CREACIÓN DE DATOS MAESTROS
-    const finalIdFab = await crearSiEsNuevo('fabricante', 'fabricante', nuevoCarro.id_fabricante, nuevoCarro.otro_fabricante);
-    const finalIdMar = await crearSiEsNuevo('marca', 'marca', nuevoCarro.id_marca, nuevoCarro.otra_marca);
-    
-    // Al crear una serie nueva, le pasamos los datos. Si ya existe, NO se sobrescribe aquí.
-    const finalIdSer = await crearSiEsNuevo('serie', 'serie', nuevoCarro.id_serie, nuevoCarro.otra_serie, { 
-      id_fabricante: finalIdFab, 
-      anio: parseInt(nuevoCarro.anio_serie) || null, 
-      no_carros: parseInt(nuevoCarro.total_carros) || null 
-    });
-    
-    // 🛡️ REGLA DE NEGOCIO: Solo SuperAdmins/Vendedores pueden editar series ya existentes
-    if (finalIdSer && nuevoCarro.id_serie !== "nuevo" && esUsuarioVIP) {
-      await supabase.from('serie').update({
-        anio: parseInt(nuevoCarro.anio_serie) || null,
-        no_carros: parseInt(nuevoCarro.total_carros) || null,
-        id_fabricante: finalIdFab
-      }).eq('id_serie', finalIdSer);
-    }
+    // 🛡️ SISTEMA DE AISLAMIENTO: RUTAS NORMAL VS CUSTOM
+    let finalIdFab = null, finalIdMar = null, finalIdSer = null, finalIdPres = null, finalIdRareza = null;
 
-    // Creación de Rarezas y Presentaciones Nuevas (Permitido para todos)
-    const finalIdRareza = await crearSiEsNuevo('rareza', 'rareza', nuevoCarro.rareza, nuevoCarro.rareza, { id_fabricante: finalIdFab });
-    const finalIdPres = await crearSiEsNuevo('presentacion', 'presentacion', nuevoCarro.id_presentacion, nuevoCarro.otra_presentacion, { id_fabricante: finalIdFab });
+    if (!nuevoCarro.es_custom) {
+      // Flujo normal: Si teclean algo "nuevo", se guarda en la base de datos maestra
+      finalIdFab = await crearSiEsNuevo('fabricante', 'fabricante', nuevoCarro.id_fabricante, nuevoCarro.otro_fabricante);
+      finalIdMar = await crearSiEsNuevo('marca', 'marca', nuevoCarro.id_marca, nuevoCarro.otra_marca);
+      
+      finalIdSer = await crearSiEsNuevo('serie', 'serie', nuevoCarro.id_serie, nuevoCarro.otra_serie, { 
+        id_fabricante: finalIdFab, anio: parseInt(nuevoCarro.anio_serie) || null, no_carros: parseInt(nuevoCarro.total_carros) || null 
+      });
+      
+      if (finalIdSer && nuevoCarro.id_serie !== "nuevo" && esUsuarioVIP) {
+        await supabase.from('serie').update({
+          anio: parseInt(nuevoCarro.anio_serie) || null, no_carros: parseInt(nuevoCarro.total_carros) || null, id_fabricante: finalIdFab
+        }).eq('id_serie', finalIdSer);
+      }
+
+      finalIdPres = await crearSiEsNuevo('presentacion', 'presentacion', nuevoCarro.id_presentacion, nuevoCarro.otra_presentacion, { id_fabricante: finalIdFab });
+      finalIdRareza = await crearSiEsNuevo('rareza', 'rareza', nuevoCarro.rareza, nuevoCarro.rareza_custom_texto, { id_fabricante: finalIdFab });
+    } else {
+      // Flujo Custom: Usamos los IDs solo si eligieron algo existente. Si escogieron "nuevo", lo dejamos null en la maestra.
+      finalIdFab = nuevoCarro.id_fabricante !== "nuevo" ? parseInt(nuevoCarro.id_fabricante) : null;
+      finalIdMar = nuevoCarro.id_marca !== "nuevo" ? parseInt(nuevoCarro.id_marca) : null;
+      finalIdSer = nuevoCarro.id_serie !== "nuevo" ? parseInt(nuevoCarro.id_serie) : null;
+      finalIdPres = nuevoCarro.id_presentacion !== "nuevo" ? parseInt(nuevoCarro.id_presentacion) : null;
+    }
 
     const finalAnio = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
     const nombreEst = estadosCarro.find((e: any) => e.id_estado_carro.toString() === nuevoCarro.id_estado_carro)?.estado_carro || "";
     const nombreFab = fabricantes.find((f: any) => f.id_fabricante.toString() === nuevoCarro.id_fabricante)?.fabricante || nuevoCarro.otro_fabricante;
     
-    // Obtenemos los nombres (strings) para la tabla carro
-    const { data: rarData } = finalIdRareza ? await supabase.from('rareza').select('rareza').eq('id_rareza', finalIdRareza).single() : { data: { rareza: nuevoCarro.rareza } };
-    const nombreRarezaFinal = rarData?.rareza || nuevoCarro.rareza;
+    const { data: rarData } = finalIdRareza ? await supabase.from('rareza').select('rareza').eq('id_rareza', finalIdRareza).single() : { data: null };
+    const nombreRarezaFinal = nuevoCarro.es_custom && nuevoCarro.rareza === 'nuevo' ? nuevoCarro.rareza_custom_texto : (rarData?.rareza || nuevoCarro.rareza);
 
-    const { data: presData } = finalIdPres ? await supabase.from('presentacion').select('presentacion').eq('id_presentacion', finalIdPres).single() : { data: { presentacion: "Individual Básico" } };
-    const nombrePresFinal = presData?.presentacion || "Individual Básico";
+    const { data: presData } = finalIdPres ? await supabase.from('presentacion').select('presentacion').eq('id_presentacion', finalIdPres).single() : { data: null };
+    const nombrePresFinal = nuevoCarro.es_custom && nuevoCarro.id_presentacion === 'nuevo' ? nuevoCarro.otra_presentacion : (presData?.presentacion || "Individual Básico");
     
-    const sugeridoIA = nuevoCarro.es_lote ? 0 : calcularValorAproximado(nuevoCarro.modelo, nombreFab, nombreRarezaFinal, nombrePresFinal, finalAnio, nombreEst);
+    // 🧠 CÁLCULO DE VALOR: Si es custom, suma base + materiales. Si es normal, usa la IA.
+    let sugeridoIA = 0;
+    if (nuevoCarro.es_custom) {
+      sugeridoIA = (parseFloat(nuevoCarro.valor_base) || 0) + (parseFloat(nuevoCarro.costo_materiales) || 0);
+    } else if (!nuevoCarro.es_lote) {
+      sugeridoIA = calcularValorAproximado(nuevoCarro.modelo, nombreFab, nombreRarezaFinal, nombrePresFinal, finalAnio, nombreEst);
+    }
 
     const payload: any = {
-      modelo: nuevoCarro.modelo, 
-      id_fabricante: finalIdFab, 
-      marca: finalIdMar, 
-      serie: finalIdSer,  
-      rareza: nombreRarezaFinal, 
-      id_presentacion: finalIdPres || null, 
-      valor: parseFloat(nuevoCarro.valor) || 0,
-      valor_calculado: sugeridoIA,
-      escala: parseInt(nuevoCarro.id_escala) || null, 
-      estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, 
-      no_carro: parseInt(nuevoCarro.no_carro) || null, 
-      para_cambio: nuevoCarro.para_cambio, 
-      para_venta: nuevoCarro.para_venta,
-      es_lote: nuevoCarro.es_lote, 
-      es_preventa: nuevoCarro.es_preventa, 
-      fecha_llegada: nuevoCarro.es_preventa ? (nuevoCarro.fecha_llegada || null) : null,
+      modelo: nuevoCarro.modelo, id_fabricante: finalIdFab, marca: finalIdMar, serie: finalIdSer,  
+      rareza: nombreRarezaFinal, id_presentacion: finalIdPres || null, 
+      valor: parseFloat(nuevoCarro.valor) || 0, valor_calculado: sugeridoIA,
+      escala: parseInt(nuevoCarro.id_escala) || null, estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, no_carro: parseInt(nuevoCarro.no_carro) || null, 
+      para_cambio: nuevoCarro.para_cambio, para_venta: nuevoCarro.para_venta,
+      es_lote: nuevoCarro.es_lote, es_preventa: nuevoCarro.es_preventa, fecha_llegada: nuevoCarro.es_preventa ? (nuevoCarro.fecha_llegada || null) : null,
       galeria: nuevoCarro.es_lote ? urlsExtraFinales : [],
-      es_subasta: nuevoCarro.es_subasta 
+      es_subasta: nuevoCarro.es_subasta,
+      es_custom: nuevoCarro.es_custom // Guardamos la bandera en la tabla principal
     };
     if (imagenUrlFinal) payload.imagen_url = imagenUrlFinal;
 
     let idCarroFinal = cocheEditando;
 
+    // INSERTAR O ACTUALIZAR CARRO EN TABLA MAESTRA
     if (cocheEditando) {
       const { error } = await supabase.from('carro').update(payload).eq('id_carro', cocheEditando);
       if (error) { alert("Error al editar: " + error.message); setGuardandoCarro(false); return; }
@@ -199,10 +199,36 @@ export default function ModalPublicacion({
       idCarroFinal = newCarroData.id_carro;
     }
 
+    // 🎨 INSERTAR EN TABLA DE CUSTOMS SI ES NECESARIO
+    if (nuevoCarro.es_custom && idCarroFinal) {
+      const customPayload = {
+        id_carro: idCarroFinal,
+        id_usuario: miPerfil.id_usuario,
+        fabricante: nuevoCarro.id_fabricante === 'nuevo' ? nuevoCarro.otro_fabricante : null,
+        marca: nuevoCarro.id_marca === 'nuevo' ? nuevoCarro.otra_marca : null,
+        serie: nuevoCarro.id_serie === 'nuevo' ? nuevoCarro.otra_serie : null,
+        presentacion: nuevoCarro.id_presentacion === 'nuevo' ? nuevoCarro.otra_presentacion : null,
+        rareza: nuevoCarro.rareza === 'nuevo' ? nuevoCarro.rareza_custom_texto : null,
+        anio: parseInt(nuevoCarro.anio_serie) || null,
+        valor_base: parseFloat(nuevoCarro.valor_base) || 0,
+        costo_materiales: parseFloat(nuevoCarro.costo_materiales) || 0
+      };
+
+      const { data: existingCustom } = await supabase.from('carro_custom').select('id_custom').eq('id_carro', idCarroFinal).single();
+      if (existingCustom) {
+        await supabase.from('carro_custom').update(customPayload).eq('id_custom', existingCustom.id_custom);
+      } else {
+        await supabase.from('carro_custom').insert([customPayload]);
+      }
+    } else if (!nuevoCarro.es_custom && cocheEditando) {
+      // Si se arrepintió de ser custom, lo borramos de la tabla paralela
+      await supabase.from('carro_custom').delete().eq('id_carro', idCarroFinal);
+    }
+
+    // GESTIÓN DE SUBASTA
     if (nuevoCarro.es_subasta && idCarroFinal) {
       const subastaPayload: any = {
-          id_carro: idCarroFinal,
-          id_vendedor: miPerfil.id_usuario,
+          id_carro: idCarroFinal, id_vendedor: miPerfil.id_usuario,
           precio_inicial: parseFloat(nuevoCarro.precio_inicial) || 0,
           incremento_minimo: parseFloat(nuevoCarro.incremento_minimo) || 10,
           fecha_cierre: new Date(nuevoCarro.fecha_cierre_subasta).toISOString(),
@@ -211,12 +237,8 @@ export default function ModalPublicacion({
 
       if (cocheEditando) {
           const { data: existingSubasta } = await supabase.from('subasta').select('id_subasta').eq('id_carro', idCarroFinal).single();
-          if (existingSubasta) {
-              await supabase.from('subasta').update(subastaPayload).eq('id_subasta', existingSubasta.id_subasta);
-          } else {
-              subastaPayload.precio_actual = subastaPayload.precio_inicial;
-              await supabase.from('subasta').insert([subastaPayload]);
-          }
+          if (existingSubasta) { await supabase.from('subasta').update(subastaPayload).eq('id_subasta', existingSubasta.id_subasta);
+          } else { subastaPayload.precio_actual = subastaPayload.precio_inicial; await supabase.from('subasta').insert([subastaPayload]); }
       } else {
           subastaPayload.precio_actual = subastaPayload.precio_inicial;
           await supabase.from('subasta').insert([subastaPayload]);
@@ -237,8 +259,6 @@ export default function ModalPublicacion({
     }
   };
 
-  // 🛡️ LÓGICA DE AUTOCOMPLETADO Y BLOQUEO DE SERIES
-  // Detecta si la serie seleccionada ya tiene Año o Total, y bloquea esos campos si no eres VIP
   const serieSeleccionadaObj = series.find((s: any) => s.id_serie === parseInt(nuevoCarro.id_serie));
   const serieTieneAnio = serieSeleccionadaObj && serieSeleccionadaObj.anio !== null;
   const serieTieneTotal = serieSeleccionadaObj && serieSeleccionadaObj.no_carros !== null;
@@ -262,6 +282,15 @@ export default function ModalPublicacion({
                 <div className="text-center p-6 flex flex-col items-center gap-3 text-slate-500"><div className="p-4 bg-white shadow-sm rounded-full border border-slate-200"><svg className="w-8 h-8 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg></div><p className="font-bold text-sm text-cyan-600">Tocar para Cámara / Galería</p></div>
               )}
             </label>
+          </div>
+
+          {/* ✨ INTERRUPTOR DE CUSTOM */}
+          <div className={`border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${nuevoCarro.es_custom ? 'bg-sky-50 border-sky-200' : 'bg-slate-50 border-slate-200'}`} onClick={() => setNuevoCarro({...nuevoCarro, es_custom: !nuevoCarro.es_custom})}>
+            <div>
+              <p className={`text-sm font-bold flex items-center gap-2 ${nuevoCarro.es_custom ? 'text-sky-700' : 'text-slate-600'}`}>🎨 Pieza Customizada</p>
+              <p className="text-xs text-slate-500 mt-1">Modo libre: Crea tu propia serie y rareza sin afectar la bóveda global.</p>
+            </div>
+            <div className={`w-12 h-6 rounded-full flex items-center transition-colors px-1 ${nuevoCarro.es_custom ? 'bg-sky-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${nuevoCarro.es_custom ? 'translate-x-6' : 'translate-x-0'}`}></div></div>
           </div>
 
           {(miPerfil?.rol === 'VENDEDOR' || miPerfil?.rol === 'SUPER_ADMIN') && (
@@ -311,7 +340,7 @@ export default function ModalPublicacion({
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="z-[35]">
-                <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Fabricante *</label>
+                <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Fabricante Base *</label>
                 <BuscadorDesplegable opciones={opcionesFabricante} valorSeleccionado={nuevoCarro.id_fabricante} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_fabricante: id, otro_fabricante: text})} placeholder="Buscar o crear..." permiteNuevo={true} />
               </div>
               <div className="z-[34]">
@@ -323,20 +352,18 @@ export default function ModalPublicacion({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="z-[33]">
                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block flex items-center gap-1">📦 Presentación / Empaque</label>
-                <BuscadorDesplegable opciones={opcionesPresentacion} valorSeleccionado={nuevoCarro.id_presentacion} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_presentacion: id, otra_presentacion: text})} placeholder="Ej. 5-Pack, Individual..." disabled={!idFabAct} permiteNuevo={true} />
+                <BuscadorDesplegable opciones={opcionesPresentacion} valorSeleccionado={nuevoCarro.id_presentacion} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_presentacion: id, otra_presentacion: text})} placeholder="Ej. 5-Pack, Individual..." disabled={!idFabAct && !nuevoCarro.es_custom} permiteNuevo={true} />
               </div>
               <div className="z-[32]">
                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block flex items-center gap-1">💎 Nivel de Rareza</label>
-                {/* AQUI LOS USUARIOS SI PUEDEN CREAR NUEVAS RAREZAS */}
-                <BuscadorDesplegable opciones={opcionesRareza} valorSeleccionado={nuevoCarro.rareza} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, rareza: id === 'nuevo' ? text : id})} placeholder="Variante (TH, Chase...)" disabled={!idFabAct} permiteNuevo={true} />
+                <BuscadorDesplegable opciones={opcionesRareza} valorSeleccionado={nuevoCarro.rareza} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, rareza: id === 'nuevo' ? text : id, rareza_custom_texto: text})} placeholder={nuevoCarro.es_custom ? "Pieza Única..." : "Variante (TH, Chase...)"} disabled={!idFabAct && !nuevoCarro.es_custom} permiteNuevo={true} />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
               <div className="sm:col-span-5 z-[31]">
                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Serie (Filtrada)</label>
-                {/* AQUI LOS USUARIOS SI PUEDEN CREAR NUEVAS SERIES */}
-                <BuscadorDesplegable opciones={opcionesSerie} valorSeleccionado={nuevoCarro.id_serie} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_serie: id, otra_serie: text})} placeholder="Ej. Exotics" disabled={!idFabAct && nuevoCarro.id_fabricante !== 'nuevo'} permiteNuevo={true} />
+                <BuscadorDesplegable opciones={opcionesSerie} valorSeleccionado={nuevoCarro.id_serie} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_serie: id, otra_serie: text})} placeholder="Ej. Exotics" disabled={!idFabAct && nuevoCarro.id_fabricante !== 'nuevo' && !nuevoCarro.es_custom} permiteNuevo={true} />
               </div>
               <div className="sm:col-span-3 flex gap-2 z-[30]">
                 <div className="w-1/2">
@@ -346,14 +373,12 @@ export default function ModalPublicacion({
                 <div className="flex items-center pt-5 text-slate-400 font-bold">/</div>
                 <div className="w-1/2">
                   <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Total</label>
-                  {/* 🛡️ BLOQUEO CONDICIONAL: Si ya tiene total y no eres VIP, se bloquea */}
-                  <input type="number" placeholder="10" disabled={(nuevoCarro.id_serie !== 'nuevo' && serieTieneTotal) && !esUsuarioVIP} value={nuevoCarro.total_carros} onChange={(e) => setNuevoCarro({...nuevoCarro, total_carros: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center disabled:bg-slate-100 disabled:text-slate-400 shadow-sm" title={(!esUsuarioVIP && serieTieneTotal) ? "Dato Maestro: Solo Colaboradores pueden editarlo" : ""} />
+                  <input type="number" placeholder="10" disabled={(nuevoCarro.id_serie !== 'nuevo' && serieTieneTotal) && !esUsuarioVIP && !nuevoCarro.es_custom} value={nuevoCarro.total_carros} onChange={(e) => setNuevoCarro({...nuevoCarro, total_carros: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-2 py-3 outline-none text-center disabled:bg-slate-100 disabled:text-slate-400 shadow-sm" />
                 </div>
               </div>
               <div className="sm:col-span-4 z-[29]">
                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block">Año</label>
-                {/* 🛡️ BLOQUEO CONDICIONAL: Si ya tiene año y no eres VIP, se bloquea */}
-                <select disabled={(nuevoCarro.id_serie !== 'nuevo' && serieTieneAnio) && !esUsuarioVIP} value={nuevoCarro.anio_serie} onChange={(e) => setNuevoCarro({...nuevoCarro, anio_serie: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-3 py-3 outline-none disabled:bg-slate-100 cursor-pointer shadow-sm" title={(!esUsuarioVIP && serieTieneAnio) ? "Dato Maestro: Solo Colaboradores pueden editarlo" : ""}>
+                <select disabled={(nuevoCarro.id_serie !== 'nuevo' && serieTieneAnio) && !esUsuarioVIP && !nuevoCarro.es_custom} value={nuevoCarro.anio_serie} onChange={(e) => setNuevoCarro({...nuevoCarro, anio_serie: e.target.value})} className="w-full bg-white border border-slate-300 text-slate-900 font-medium rounded-xl px-3 py-3 outline-none disabled:bg-slate-100 cursor-pointer shadow-sm">
                   <option value="">-- Seleccionar --</option>
                   {aniosDisponibles.map((anio: number) => <option key={anio} value={anio}>{anio}</option>)}
                 </select>
@@ -370,6 +395,20 @@ export default function ModalPublicacion({
                 <BuscadorDesplegable opciones={opcionesEscala} valorSeleccionado={nuevoCarro.id_escala} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, id_escala: id})} placeholder="Seleccionar..." permiteNuevo={false} />
               </div>
             </div>
+
+            {/* ✨ SECCIÓN EXCLUSIVA PARA CUSTOMS */}
+            {nuevoCarro.es_custom && (
+              <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 flex gap-4">
+                <div className="w-1/2">
+                  <label className="text-xs text-sky-700 font-bold uppercase tracking-wider block mb-2">Valor Pieza Base ($)</label>
+                  <input type="number" step="0.01" placeholder="Ej. 50.00" value={nuevoCarro.valor_base || ""} onChange={(e) => setNuevoCarro({...nuevoCarro, valor_base: e.target.value})} className="w-full bg-white border border-sky-300 text-sky-800 font-black rounded-lg px-4 py-3 outline-none focus:border-sky-500 shadow-sm" />
+                </div>
+                <div className="w-1/2">
+                  <label className="text-xs text-sky-700 font-bold uppercase tracking-wider block mb-2">Costo Materiales ($)</label>
+                  <input type="number" step="0.01" placeholder="Ej. 100.00" value={nuevoCarro.costo_materiales || ""} onChange={(e) => setNuevoCarro({...nuevoCarro, costo_materiales: e.target.value})} className="w-full bg-white border border-sky-300 text-sky-800 font-black rounded-lg px-4 py-3 outline-none focus:border-sky-500 shadow-sm" />
+                </div>
+              </div>
+            )}
 
             {/* 🛒 SECCIÓN DE VENTA / NEGOCIACIÓN / SUBASTA */}
             {miPerfil?.rol === 'VENDEDOR' || miPerfil?.rol === 'SUPER_ADMIN' ? (
@@ -437,7 +476,8 @@ export default function ModalPublicacion({
                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                           <div className="flex justify-between items-end mb-1">
                             <label className="text-xs text-slate-500 font-bold uppercase tracking-wider block">Valor de Venta ($)</label>
-                            {!cocheEditando && nuevoCarro.modelo && !nuevoCarro.es_lote && <span className="text-[9px] bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-bold">IA Automática 🤖</span>}
+                            {(!cocheEditando && nuevoCarro.modelo && !nuevoCarro.es_lote && !nuevoCarro.es_custom) && <span className="text-[9px] bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-bold">IA Automática 🤖</span>}
+                            {nuevoCarro.es_custom && <span className="text-[9px] bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full font-bold">Costo Materiales 🎨</span>}
                           </div>
                           <input type="number" step="0.01" required={nuevoCarro.para_venta} placeholder="0.00" value={nuevoCarro.valor} onChange={(e) => setNuevoCarro({...nuevoCarro, valor: e.target.value})} className="w-full bg-white border border-slate-300 text-emerald-600 font-black rounded-lg px-4 py-3 outline-none focus:border-cyan-500 shadow-sm" />
                        </div>
@@ -458,7 +498,8 @@ export default function ModalPublicacion({
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                   <div className="flex justify-between items-end mb-1">
                     <label className="text-xs text-slate-500 font-bold uppercase tracking-wider block">Valor de la Pieza ($)</label>
-                    {!cocheEditando && nuevoCarro.modelo && !nuevoCarro.es_lote && <span className="text-[9px] bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-bold">IA Automática 🤖</span>}
+                    {(!cocheEditando && nuevoCarro.modelo && !nuevoCarro.es_lote && !nuevoCarro.es_custom) && <span className="text-[9px] bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-bold">IA Automática 🤖</span>}
+                    {nuevoCarro.es_custom && <span className="text-[9px] bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full font-bold">Costo Materiales 🎨</span>}
                   </div>
                   <input type="number" step="0.01" placeholder="0.00" value={nuevoCarro.valor} onChange={(e) => setNuevoCarro({...nuevoCarro, valor: e.target.value})} className="w-full bg-white border border-slate-300 text-emerald-600 font-black rounded-lg px-4 py-3 outline-none focus:border-cyan-500 shadow-sm" />
                 </div>

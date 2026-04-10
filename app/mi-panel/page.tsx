@@ -44,13 +44,17 @@ export default function MiPanelUsuario() {
   const [nuevosLogros, setNuevosLogros] = useState<string[]>([]);
   const [misTrofeos, setMisTrofeos] = useState<any[]>([]);
 
-  const [nuevoCarro, setNuevoCarro] = useState({
+  // Estado inicial estándar para un carro
+  const estadoInicialCarro = {
     modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "",
-    id_serie: "", otra_serie: "", rareza: "", id_presentacion: "", otra_presentacion: "", valor: "", id_escala: "", id_estado_carro: "", 
+    id_serie: "", otra_serie: "", rareza: "", rareza_custom_texto: "", id_presentacion: "", otra_presentacion: "", valor: "", id_escala: "", id_estado_carro: "", 
     no_carro: "", total_carros: "", anio_serie: "", para_cambio: false, para_venta: false,
     es_lote: false, es_preventa: false, fecha_llegada: "",
-    es_subasta: false, precio_inicial: "", incremento_minimo: "10", fecha_cierre_subasta: ""
-  });
+    es_subasta: false, precio_inicial: "", incremento_minimo: "10", fecha_cierre_subasta: "",
+    es_custom: false, valor_base: "", costo_materiales: ""
+  };
+
+  const [nuevoCarro, setNuevoCarro] = useState(estadoInicialCarro);
 
   const anioActual = new Date().getFullYear();
   const aniosDisponibles = Array.from({ length: anioActual - 1890 + 1 }, (_, i) => anioActual - i);
@@ -67,7 +71,8 @@ export default function MiPanelUsuario() {
     if (perfilData) {
       setMiPerfil(perfilData);
 
-      const { data: carrosData } = await supabase.from('carro').select(`*, marca(marca), serie(*), fabricante(fabricante), presentacion(presentacion)`).eq('id_usuario', perfilData.id_usuario).order('id_carro', { ascending: false });
+      // ✨ SE MANTIENE LA ACTUALIZACIÓN: Jalar la información de la tabla carro_custom
+      const { data: carrosData } = await supabase.from('carro').select(`*, marca(marca), serie(*), fabricante(fabricante), presentacion(presentacion), carro_custom(*)`).eq('id_usuario', perfilData.id_usuario).order('id_carro', { ascending: false });
       if (carrosData) setMisCarros(carrosData);
 
       const { data: todosLosLogros } = await supabase.from('logro').select('*').order('id_logro', { ascending: true });
@@ -122,25 +127,56 @@ export default function MiPanelUsuario() {
         fechaCierreStr = d.toISOString().slice(0, 16);
       }
 
+      // 🛡️ REGLA: Extraemos datos sandbox si existen para pre-poblar
+      const datosCustom = carro.carro_custom?.[0] || {};
+      
+      const valBase = datosCustom.valor_base || "";
+      const costMat = datosCustom.costo_materiales || "";
+
+      // ✨ SE MANTIENE LA LÓGICA: Pre-calculamos el valor custom con el motor actualizado
+      const valorCustomPreCalculado = carro.es_custom 
+        ? calcularValorAproximado(
+            carro.modelo, carro.fabricante?.fabricante, carro.rareza, "Individual Básico", parseInt(carro.serie?.anio), "Loose",
+            { valor_base: valBase, costo_materiales: costMat } // Pasamos los costos
+          )
+        : "";
+
       setNuevoCarro({ 
         modelo: carro.modelo || "", 
-        id_fabricante: carro.id_fabricante ? carro.id_fabricante.toString() : "", 
-        otro_fabricante: "", id_marca: idMarcaReal.toString(), otra_marca: "", id_serie: idSerieReal.toString(), 
-        otra_serie: "", rareza: idRarezaReal.toString(), id_presentacion: carro.id_presentacion ? carro.id_presentacion.toString() : "", 
-        otra_presentacion: "", valor: carro.valor ? carro.valor.toString() : "", id_escala: carro.escala ? carro.escala.toString() : "", 
-        id_estado_carro: carro.estado_carro ? carro.estado_carro.toString() : "", no_carro: carro.no_carro ? carro.no_carro.toString() : "", 
-        total_carros: carro.serie?.no_carros ? carro.serie.no_carros.toString() : "", anio_serie: carro.serie?.anio ? carro.serie.anio.toString() : "", 
+        // Si es sandbox y el fabricante es null, usamos "nuevo". Sino, su ID.
+        id_fabricante: (carro.es_custom && !carro.id_fabricante) ? "nuevo" : (carro.id_fabricante ? carro.id_fabricante.toString() : ""), 
+        otro_fabricante: datosCustom.fabricante || "", // Nombres sandbox
+        id_marca: (carro.es_custom && !idMarcaReal) ? "nuevo" : idMarcaReal.toString(), 
+        otra_marca: datosCustom.marca || "", // Nombres sandbox
+        id_serie: (carro.es_custom && !idSerieReal) ? "nuevo" : idSerieReal.toString(), 
+        otra_serie: datosCustom.serie || "", // Nombres sandbox
+        rareza: (carro.es_custom && !rarezas.find(r => r.id_rareza === parseInt(carro.rareza))) ? "nuevo" : idRarezaReal.toString(), 
+        rareza_custom_texto: datosCustom.rareza || "", 
+        id_presentacion: (carro.es_custom && !carro.id_presentacion) ? "nuevo" : (carro.id_presentacion ? carro.id_presentacion.toString() : ""), 
+        otra_presentacion: datosCustom.presentacion || "Individual Básico", 
+        // 🛡️ Pre-poblamos el valor. Si es custom, usamos el valor pre-calculado, sino, su valor actual de la bóveda.
+        valor: carro.es_custom ? valorCustomPreCalculado.toString() : (carro.valor ? carro.valor.toString() : ""), 
+        id_escala: carro.escala ? carro.escala.toString() : "", 
+        id_estado_carro: carro.estado_carro ? carro.estado_carro.toString() : "", 
+        no_carro: carro.no_carro ? carro.no_carro.toString() : "", 
+        total_carros: carro.serie?.no_carros ? carro.serie.no_carros.toString() : "", 
+        // Si es custom sandbox y no tiene año de serie maestra, usamos el año sandbox
+        anio_serie: (carro.es_custom && !carro.serie?.anio && datosCustom.anio) ? datosCustom.anio.toString() : (carro.serie?.anio ? carro.serie.anio.toString() : ""), 
         para_cambio: carro.para_cambio || false, para_venta: carro.para_venta || false, es_lote: carro.es_lote || false,
         es_preventa: carro.es_preventa || false, fecha_llegada: carro.fecha_llegada || "", es_subasta: carro.es_subasta || false,
         precio_inicial: subData ? subData.precio_inicial.toString() : "", incremento_minimo: subData ? subData.incremento_minimo.toString() : "10",
-        fecha_cierre_subasta: fechaCierreStr
+        fecha_cierre_subasta: fechaCierreStr,
+        // ✨ SE MANTIENE EL ESTADO CUSTOM: Seteamos los costos custom sandbox para pre-poblar
+        es_custom: carro.es_custom || false,
+        valor_base: valBase.toString(), 
+        costo_materiales: costMat.toString()
       });
       setFotoPreviewCarro(carro.imagen_url || null);
       if (carro.es_lote && carro.galeria) setFotosExtraExistentes(carro.galeria); else setFotosExtraExistentes([]);
       setFotosExtraNuevas([]); setFotosExtraPreview([]);
     } else {
       setCocheEditando(null); setFotoPreviewCarro(null); setFotosExtraExistentes([]); setFotosExtraNuevas([]); setFotosExtraPreview([]);
-      setNuevoCarro({ modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "", id_serie: "", otra_serie: "", rareza: "", id_presentacion: "", otra_presentacion: "", valor: "", id_escala: "", id_estado_carro: "", no_carro: "", total_carros: "", anio_serie: "", para_cambio: false, para_venta: false, es_lote: false, es_preventa: false, fecha_llegada: "", es_subasta: false, precio_inicial: "", incremento_minimo: "10", fecha_cierre_subasta: "" });
+      setNuevoCarro(estadoInicialCarro); // Reset limpio
     }
     setFotoArchivoCarro(null); setIsModalOpen(true);
   };

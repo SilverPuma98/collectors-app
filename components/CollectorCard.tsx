@@ -4,16 +4,25 @@ interface CollectorCardProps {
   modelo: string;
   marca: string;
   rareza: string;
-  presentacion?: string; // 📦 NUEVO: Recibe la presentación
+  presentacion?: string; 
   valor: number;
-  valorCalculado?: number; // 🧠 Recibe el valor de la IA
+  valorCalculado?: number; 
   imagenUrl?: string;
+  esCustom?: boolean; // ✨ NUEVO: Recibe si la pieza es custom
 }
 
-export default function CollectorCard({ modelo, marca, rareza, presentacion, valor, valorCalculado, imagenUrl }: CollectorCardProps) {
+export default function CollectorCard({ modelo, marca, rareza, presentacion, valor, valorCalculado, imagenUrl, esCustom }: CollectorCardProps) {
   return (
-    <div className="bg-[#0b1120] border border-slate-800 rounded-2xl overflow-hidden shadow-lg hover:border-cyan-800 transition-colors w-full flex flex-col h-full">
+    // ✨ ACTUALIZACIÓN: Si es custom, el borde brillará en amarillo (amber) al pasar el mouse
+    <div className={`bg-[#0b1120] border border-slate-800 rounded-2xl overflow-hidden shadow-lg transition-colors w-full flex flex-col h-full relative ${esCustom ? 'hover:border-amber-500' : 'hover:border-cyan-800'}`}>
       
+      {/* ✨ ETIQUETA CUSTOM PROMINENTE */}
+      {esCustom && (
+        <div className="absolute top-2 left-2 z-20 bg-amber-400 text-slate-900 text-[10px] font-black px-2.5 py-1 rounded shadow-lg border border-amber-200 flex items-center gap-1">
+          <span>🎨</span> CUSTOM
+        </div>
+      )}
+
       {/* FOTO DE LA PIEZA */}
       <div className="relative w-full aspect-[4/3] bg-white flex items-center justify-center p-2">
         {imagenUrl ? (
@@ -26,7 +35,10 @@ export default function CollectorCard({ modelo, marca, rareza, presentacion, val
       {/* TEXTOS Y DATOS */}
       <div className="p-3 md:p-4 flex flex-col flex-1 justify-between gap-3">
         <div>
-          <p className="text-[9px] md:text-[10px] font-bold text-cyan-500 uppercase tracking-widest mb-1 truncate">{marca}</p>
+          {/* ✨ Si es custom, pintamos la marca de otro color para resaltarla */}
+          <p className={`text-[9px] md:text-[10px] font-bold uppercase tracking-widest mb-1 truncate ${esCustom ? 'text-amber-500' : 'text-cyan-500'}`}>
+            {marca}
+          </p>
           <h3 className="text-xs md:text-sm font-black text-white leading-tight line-clamp-2">{modelo}</h3>
         </div>
         
@@ -51,10 +63,10 @@ export default function CollectorCard({ modelo, marca, rareza, presentacion, val
               ${valor ? valor.toLocaleString() : '0'}
             </span>
             
-            {/* Valor IA (Dorado) - Solo si existe y es mayor a 0 */}
+            {/* Valor IA (Dorado) / Costo Base Custom - Solo si existe y es mayor a 0 */}
             {(valorCalculado !== undefined && valorCalculado > 0) && (
               <span className="text-amber-400 font-black text-[9px] md:text-[10px] leading-none flex items-center gap-1 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">
-                IA: ${valorCalculado.toLocaleString()}
+                {esCustom ? 'BASE: ' : 'IA: '}${valorCalculado.toLocaleString()}
               </span>
             )}
           </div>
