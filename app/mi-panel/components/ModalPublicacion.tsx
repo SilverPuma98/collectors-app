@@ -42,13 +42,13 @@ export default function ModalPublicacion({
   const rarezasFiltradas = idFabAct ? rarezas.filter((r: any) => r.id_fabricante === idFabAct) : rarezas;
   const presentacionesFiltradas = idFabAct ? presentaciones.filter((p: any) => p.id_fabricante === idFabAct) : presentaciones; 
 
-  const opcionesFabricante = fabricantes.map((f: any) => ({ id: f.id_fabricante.toString(), label: f.fabricante }));
-  const opcionesMarca = marcas.map((m: any) => ({ id: m.id_marca.toString(), label: m.marca }));
-  const opcionesSerie = seriesFiltradas.map((s: any) => ({ id: s.id_serie.toString(), label: `${s.serie} ${s.anio ? `(${s.anio})` : ''}` }));
-  const opcionesRareza = rarezasFiltradas.map((r: any) => ({ id: r.id_rareza.toString(), label: r.rareza }));
-  const opcionesPresentacion = presentacionesFiltradas.map((p: any) => ({ id: p.id_presentacion.toString(), label: p.presentacion })); 
-  const opcionesEstado = estadosCarro.map((e: any) => ({ id: e.id_estado_carro.toString(), label: e.estado_carro }));
-  const opcionesEscala = escalas.map((e: any) => ({ id: e.id_escala.toString(), label: e.escala }));
+  const opcionesFabricante = fabricantes.map((f: any) => ({ id: String(f.id_fabricante), label: f.fabricante }));
+  const opcionesMarca = marcas.map((m: any) => ({ id: String(m.id_marca), label: m.marca }));
+  const opcionesSerie = seriesFiltradas.map((s: any) => ({ id: String(s.id_serie), label: `${s.serie} ${s.anio ? `(${s.anio})` : ''}` }));
+  const opcionesRareza = rarezasFiltradas.map((r: any) => ({ id: String(r.id_rareza), label: r.rareza }));
+  const opcionesPresentacion = presentacionesFiltradas.map((p: any) => ({ id: String(p.id_presentacion), label: p.presentacion })); 
+  const opcionesEstado = estadosCarro.map((e: any) => ({ id: String(e.id_estado_carro), label: e.estado_carro }));
+  const opcionesEscala = escalas.map((e: any) => ({ id: String(e.id_escala), label: e.escala }));
 
   const esUsuarioVIP = miPerfil?.rol === 'SUPER_ADMIN' || miPerfil?.rol === 'VENDEDOR'; 
 
@@ -126,11 +126,9 @@ export default function ModalPublicacion({
       }
     }
 
-    // 🛡️ SISTEMA DE AISLAMIENTO: RUTAS NORMAL VS CUSTOM
     let finalIdFab = null, finalIdMar = null, finalIdSer = null, finalIdPres = null, finalIdRareza = null;
 
     if (!nuevoCarro.es_custom) {
-      // Flujo normal: Si teclean algo "nuevo", se guarda en la base de datos maestra
       finalIdFab = await crearSiEsNuevo('fabricante', 'fabricante', nuevoCarro.id_fabricante, nuevoCarro.otro_fabricante);
       finalIdMar = await crearSiEsNuevo('marca', 'marca', nuevoCarro.id_marca, nuevoCarro.otra_marca);
       
@@ -147,27 +145,23 @@ export default function ModalPublicacion({
       finalIdPres = await crearSiEsNuevo('presentacion', 'presentacion', nuevoCarro.id_presentacion, nuevoCarro.otra_presentacion, { id_fabricante: finalIdFab });
       finalIdRareza = await crearSiEsNuevo('rareza', 'rareza', nuevoCarro.rareza, nuevoCarro.rareza_custom_texto, { id_fabricante: finalIdFab });
     } else {
-      // Flujo Custom: Usamos los IDs solo si eligieron algo existente. Si escogieron "nuevo", lo dejamos null en la maestra.
       finalIdFab = nuevoCarro.id_fabricante !== "nuevo" ? parseInt(nuevoCarro.id_fabricante) : null;
       finalIdMar = nuevoCarro.id_marca !== "nuevo" ? parseInt(nuevoCarro.id_marca) : null;
       finalIdSer = nuevoCarro.id_serie !== "nuevo" ? parseInt(nuevoCarro.id_serie) : null;
       finalIdPres = nuevoCarro.id_presentacion !== "nuevo" ? parseInt(nuevoCarro.id_presentacion) : null;
-      // ✨ LÍNEA CORREGIDA PARA SOLUCIONAR EL ERROR "2"
       finalIdRareza = nuevoCarro.rareza !== "nuevo" ? parseInt(nuevoCarro.rareza) : null;
     }
 
     const finalAnio = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
-    const nombreEst = estadosCarro.find((e: any) => e.id_estado_carro.toString() === nuevoCarro.id_estado_carro)?.estado_carro || "";
-    const nombreFab = fabricantes.find((f: any) => f.id_fabricante.toString() === nuevoCarro.id_fabricante)?.fabricante || nuevoCarro.otro_fabricante;
+    const nombreEst = estadosCarro.find((e: any) => String(e.id_estado_carro) === String(nuevoCarro.id_estado_carro))?.estado_carro || "";
+    const nombreFab = fabricantes.find((f: any) => String(f.id_fabricante) === String(nuevoCarro.id_fabricante))?.fabricante || nuevoCarro.otro_fabricante;
     
-    // Aquí el sistema traduce el ID de la rareza por su nombre real
     const { data: rarData } = finalIdRareza ? await supabase.from('rareza').select('rareza').eq('id_rareza', finalIdRareza).single() : { data: null };
-    const nombreRarezaFinal = nuevoCarro.es_custom && nuevoCarro.rareza === 'nuevo' ? nuevoCarro.rareza_custom_texto : (rarData?.rareza || nuevoCarro.rareza);
+    const nombreRarezaFinal = nuevoCarro.es_custom && nuevoCarro.rareza === 'nuevo' ? nuevoCarro.rareza_custom_texto : (rarData?.rareza || "");
 
     const { data: presData } = finalIdPres ? await supabase.from('presentacion').select('presentacion').eq('id_presentacion', finalIdPres).single() : { data: null };
     const nombrePresFinal = nuevoCarro.es_custom && nuevoCarro.id_presentacion === 'nuevo' ? nuevoCarro.otra_presentacion : (presData?.presentacion || "Individual Básico");
     
-    // 🧠 CÁLCULO DE VALOR: Si es custom, suma base + materiales. Si es normal, usa la IA.
     let sugeridoIA = 0;
     if (nuevoCarro.es_custom) {
       sugeridoIA = (parseFloat(nuevoCarro.valor_base) || 0) + (parseFloat(nuevoCarro.costo_materiales) || 0);
@@ -176,21 +170,31 @@ export default function ModalPublicacion({
     }
 
     const payload: any = {
-      modelo: nuevoCarro.modelo, id_fabricante: finalIdFab, marca: finalIdMar, serie: finalIdSer,  
-      rareza: nombreRarezaFinal, id_presentacion: finalIdPres || null, 
-      valor: parseFloat(nuevoCarro.valor) || 0, valor_calculado: sugeridoIA,
-      escala: parseInt(nuevoCarro.id_escala) || null, estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, no_carro: parseInt(nuevoCarro.no_carro) || null, 
-      para_cambio: nuevoCarro.para_cambio, para_venta: nuevoCarro.para_venta,
-      es_lote: nuevoCarro.es_lote, es_preventa: nuevoCarro.es_preventa, fecha_llegada: nuevoCarro.es_preventa ? (nuevoCarro.fecha_llegada || null) : null,
+      modelo: nuevoCarro.modelo, 
+      id_fabricante: finalIdFab, 
+      marca: finalIdMar, 
+      serie: finalIdSer,  
+      id_rareza: finalIdRareza || null, 
+      // ✨ MAGIA: Quitamos la columna 'rareza' para que Supabase ya no explote
+      id_presentacion: finalIdPres || null, 
+      valor: parseFloat(nuevoCarro.valor) || 0, 
+      valor_calculado: sugeridoIA,
+      escala: parseInt(nuevoCarro.id_escala) || null, 
+      estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, 
+      no_carro: parseInt(nuevoCarro.no_carro) || null, 
+      para_cambio: nuevoCarro.para_cambio, 
+      para_venta: nuevoCarro.para_venta,
+      es_lote: nuevoCarro.es_lote, 
+      es_preventa: nuevoCarro.es_preventa, 
+      fecha_llegada: nuevoCarro.es_preventa ? (nuevoCarro.fecha_llegada || null) : null,
       galeria: nuevoCarro.es_lote ? urlsExtraFinales : [],
       es_subasta: nuevoCarro.es_subasta,
-      es_custom: nuevoCarro.es_custom // Guardamos la bandera en la tabla principal
+      es_custom: nuevoCarro.es_custom
     };
     if (imagenUrlFinal) payload.imagen_url = imagenUrlFinal;
 
     let idCarroFinal = cocheEditando;
 
-    // INSERTAR O ACTUALIZAR CARRO EN TABLA MAESTRA
     if (cocheEditando) {
       const { error } = await supabase.from('carro').update(payload).eq('id_carro', cocheEditando);
       if (error) { alert("Error al editar: " + error.message); setGuardandoCarro(false); return; }
@@ -202,7 +206,6 @@ export default function ModalPublicacion({
       idCarroFinal = newCarroData.id_carro;
     }
 
-    // 🎨 INSERTAR EN TABLA DE CUSTOMS SI ES NECESARIO
     if (nuevoCarro.es_custom && idCarroFinal) {
       const customPayload = {
         id_carro: idCarroFinal,
@@ -224,11 +227,9 @@ export default function ModalPublicacion({
         await supabase.from('carro_custom').insert([customPayload]);
       }
     } else if (!nuevoCarro.es_custom && cocheEditando) {
-      // Si se arrepintió de ser custom, lo borramos de la tabla paralela
       await supabase.from('carro_custom').delete().eq('id_carro', idCarroFinal);
     }
 
-    // GESTIÓN DE SUBASTA
     if (nuevoCarro.es_subasta && idCarroFinal) {
       const subastaPayload: any = {
           id_carro: idCarroFinal, id_vendedor: miPerfil.id_usuario,
@@ -262,7 +263,7 @@ export default function ModalPublicacion({
     }
   };
 
-  const serieSeleccionadaObj = series.find((s: any) => s.id_serie === parseInt(nuevoCarro.id_serie));
+  const serieSeleccionadaObj = series.find((s: any) => String(s.id_serie) === String(nuevoCarro.id_serie));
   const serieTieneAnio = serieSeleccionadaObj && serieSeleccionadaObj.anio !== null;
   const serieTieneTotal = serieSeleccionadaObj && serieSeleccionadaObj.no_carros !== null;
 
@@ -287,7 +288,6 @@ export default function ModalPublicacion({
             </label>
           </div>
 
-          {/* ✨ INTERRUPTOR DE CUSTOM */}
           <div className={`border p-4 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${nuevoCarro.es_custom ? 'bg-sky-50 border-sky-200' : 'bg-slate-50 border-slate-200'}`} onClick={() => setNuevoCarro({...nuevoCarro, es_custom: !nuevoCarro.es_custom})}>
             <div>
               <p className={`text-sm font-bold flex items-center gap-2 ${nuevoCarro.es_custom ? 'text-sky-700' : 'text-slate-600'}`}>🎨 Pieza Customizada</p>
@@ -359,7 +359,14 @@ export default function ModalPublicacion({
               </div>
               <div className="z-[32]">
                 <label className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 block flex items-center gap-1">💎 Nivel de Rareza</label>
-                <BuscadorDesplegable opciones={opcionesRareza} valorSeleccionado={nuevoCarro.rareza} onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, rareza: id === 'nuevo' ? text : id, rareza_custom_texto: text})} placeholder={nuevoCarro.es_custom ? "Pieza Única..." : "Variante (TH, Chase...)"} disabled={!idFabAct && !nuevoCarro.es_custom} permiteNuevo={true} />
+                <BuscadorDesplegable 
+                  opciones={opcionesRareza} 
+                  valorSeleccionado={nuevoCarro.rareza} 
+                  onSelect={(id: string, text: string) => setNuevoCarro({...nuevoCarro, rareza: id, rareza_custom_texto: text})} 
+                  placeholder={nuevoCarro.es_custom ? "Pieza Única..." : "Variante (TH, Chase...)"} 
+                  disabled={!idFabAct && !nuevoCarro.es_custom} 
+                  permiteNuevo={true} 
+                />
               </div>
             </div>
 
@@ -399,7 +406,6 @@ export default function ModalPublicacion({
               </div>
             </div>
 
-            {/* ✨ SECCIÓN EXCLUSIVA PARA CUSTOMS */}
             {nuevoCarro.es_custom && (
               <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 flex gap-4">
                 <div className="w-1/2">
@@ -413,7 +419,6 @@ export default function ModalPublicacion({
               </div>
             )}
 
-            {/* 🛒 SECCIÓN DE VENTA / NEGOCIACIÓN / SUBASTA */}
             {miPerfil?.rol === 'VENDEDOR' || miPerfil?.rol === 'SUPER_ADMIN' ? (
               <div className="space-y-2 mt-2">
                 

@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const idCarro = resolvedParams.id;
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get() { return ''; } } });
   
-  // ✨ ACTUALIZACIÓN: Traer datos custom para el SEO
+  // ✨ ACTUALIZACIÓN SEO: Nos aseguramos de traer rareza(rareza) si la fuéramos a usar, aunque aquí usamos la marca
   const { data: carro } = await supabase.from('carro').select('modelo, marca(marca), es_custom, carro_custom(marca), valor, imagen_url, usuario:id_usuario(nombre_usuario)').eq('id_carro', idCarro).single();
   
   if (!carro) return { title: 'Pieza no encontrada - Collectors' };
@@ -50,7 +50,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
     { cookies: { get(name: string) { return cookieStore.get(name)?.value; } } }
   );
 
-  // ✨ ACTUALIZACIÓN: Agregamos `carro_custom(*)` al query
+  // ✨ ACTUALIZACIÓN MAESTRA: Añadimos rareza(rareza) a la consulta principal
   const { data: carro } = await supabase
     .from('carro')
     .select(`
@@ -59,6 +59,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
       fabricante(fabricante),
       serie(*),
       presentacion(presentacion),
+      rareza(rareza),
       escala_rel:escala(escala),
       estado_carro_rel:estado_carro(estado_carro),
       usuario:id_usuario(id_usuario, nombre_usuario, link_img_perf, whatsapp, facebook, correo, rol, es_fundador),
@@ -128,14 +129,16 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
   const urlCompartir = `https://collectors-app-ecru.vercel.app/pieza/${idCarro}`;
   const textoCompartir = `¡Mira este ${carro.modelo} valuado en $${carro.valor} en Collectors!`;
 
-  // ✨ LÓGICA INTELIGENTE: Extraer Nombres Custom
   const datosCustom = carro.carro_custom?.[0] || {};
   const nombreMarca = (carro.es_custom && datosCustom.marca) ? datosCustom.marca : (carro.marca?.marca || "Desconocida");
   const nombreFabricante = (carro.es_custom && datosCustom.fabricante) ? datosCustom.fabricante : (carro.fabricante?.fabricante || "Sin Fabricante");
   const nombreSerie = (carro.es_custom && datosCustom.serie) ? datosCustom.serie : (carro.serie?.serie || "Sin Serie");
   const anioSerie = (carro.es_custom && datosCustom.anio) ? datosCustom.anio : carro.serie?.anio;
-  const nombreRareza = (carro.es_custom && datosCustom.rareza) ? datosCustom.rareza : (carro.rareza || "Estándar");
   const nombrePresentacion = (carro.es_custom && datosCustom.presentacion) ? datosCustom.presentacion : (carro.presentacion?.presentacion || "Individual Básico");
+
+  // ✨ BLINDAJE DE EXTRACCIÓN: Sacamos la rareza del objeto que nos manda Supabase y la pasamos por String()
+  const rRaw = carro.es_custom && datosCustom.rareza ? datosCustom.rareza : carro.rareza;
+  const nombreRareza = typeof rRaw === 'object' ? (rRaw?.rareza || "Común") : (rRaw || "Común");
 
 
   return (
@@ -146,27 +149,22 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
           Volver al Perfil
         </Link>
-
         <BotonCompartir titulo={carro.modelo} texto={textoCompartir} url={urlCompartir} />
       </div>
 
       <div className="max-w-6xl mx-auto px-4 mt-6 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-        
         <div className="lg:col-span-7 flex flex-col gap-4">
           <GaleriaImagenes imagenPrincipal={carro.imagen_url} galeria={carro.galeria} modelo={carro.modelo}>
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-2 items-start">
-              
-              {/* ✨ ETIQUETA SUPERIOR CUSTOM */}
               {carro.es_custom && (
                 <div className="bg-amber-400 border border-amber-300 text-slate-900 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg flex items-center gap-1.5">
                   <span>🎨</span> CUSTOM
                 </div>
               )}
-
+              {/* ✨ IMPRESIÓN BLINDADA DE RAREZA */}
               <div className="bg-white/90 backdrop-blur-md border border-slate-200 text-slate-800 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-md">
-                {nombreRareza}
+                {String(nombreRareza)}
               </div>
-
               {nombrePresentacion && nombrePresentacion !== 'Individual Básico' && (
                 <div className="bg-indigo-900/80 backdrop-blur-md border border-indigo-500/50 text-indigo-100 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-1">
                   📦 {nombrePresentacion}
@@ -195,7 +193,6 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
         </div>
 
         <div className="lg:col-span-5 flex flex-col">
-          
           <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 hover:border-cyan-400 transition-colors w-fit mb-6 group shadow-sm">
             <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border-2 border-transparent group-hover:border-cyan-500 transition-colors">
               {carro.usuario?.link_img_perf ? <img src={carro.usuario.link_img_perf} alt="Avatar" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-200"></div>}
@@ -272,7 +269,6 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
                 <p className="text-3xl font-black text-slate-900">${carro.valor ? carro.valor.toLocaleString() : '0'}</p>
               </div>
 
-              {/* ✨ ACTUALIZACIÓN: Panel IA o Panel Costo Base (Si es Custom) */}
               <div className={`${carro.es_custom ? 'bg-amber-50 border-amber-200' : 'bg-cyan-50 border-cyan-200'} border rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left relative overflow-hidden`}>
                 <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 ${carro.es_custom ? 'bg-amber-400/20' : 'bg-cyan-400/20'}`}></div>
                 <p className={`text-[10px] uppercase font-black tracking-widest mb-1 relative z-10 flex items-center gap-1.5 ${carro.es_custom ? 'text-amber-700' : 'text-cyan-700'}`}>
@@ -315,18 +311,18 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
                 {enlaceWhatsApp ? (
                   <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-amber-500/40">
                     <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.305-.885-.653-1.48-1.459-1.653-1.756-.173-.298-.019-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 00-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-                    {carro.es_preventa ? "Apartar con el Vendedor" : "Comprar Directo"}
-                  </a>
-                ) : enlaceFacebook ? (
-                  <a href={enlaceFacebook.startsWith('http') ? enlaceFacebook : `https://${enlaceFacebook}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#1877F2] hover:bg-[#155ebb] text-white font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg">
-                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                    Contactar por Facebook
-                  </a>
-                ) : (
-                  <p className="text-xs text-amber-700 font-bold">Esta tienda no tiene redes registradas.</p>
-                )}
-              </div>
+                  Comprar Directo
+                </a>
+              ) : enlaceFacebook ? (
+                <a href={enlaceFacebook.startsWith('http') ? enlaceFacebook : `https://${enlaceFacebook}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#1877F2] hover:bg-[#155ebb] text-white font-black text-lg py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg">
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                  Contactar por Facebook
+                </a>
+              ) : (
+                <p className="text-xs text-amber-700 font-bold">Esta tienda no tiene redes registradas.</p>
+              )}
             </div>
+          </div>
           ) : !esCambio ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
               <p className="text-2xl mb-2">🔒</p>

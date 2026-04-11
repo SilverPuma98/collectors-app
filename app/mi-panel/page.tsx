@@ -44,7 +44,6 @@ export default function MiPanelUsuario() {
   const [nuevosLogros, setNuevosLogros] = useState<string[]>([]);
   const [misTrofeos, setMisTrofeos] = useState<any[]>([]);
 
-  // Estado inicial estándar para un carro
   const estadoInicialCarro = {
     modelo: "", id_fabricante: "", otro_fabricante: "", id_marca: "", otra_marca: "",
     id_serie: "", otra_serie: "", rareza: "", rareza_custom_texto: "", id_presentacion: "", otra_presentacion: "", valor: "", id_escala: "", id_estado_carro: "", 
@@ -71,8 +70,8 @@ export default function MiPanelUsuario() {
     if (perfilData) {
       setMiPerfil(perfilData);
 
-      // ✨ SE MANTIENE LA ACTUALIZACIÓN: Jalar la información de la tabla carro_custom
-      const { data: carrosData } = await supabase.from('carro').select(`*, marca(marca), serie(*), fabricante(fabricante), presentacion(presentacion), carro_custom(*)`).eq('id_usuario', perfilData.id_usuario).order('id_carro', { ascending: false });
+      // ✨ ACTUALIZACIÓN: Jalar la información de rareza
+      const { data: carrosData } = await supabase.from('carro').select(`*, marca(marca), serie(*), fabricante(fabricante), presentacion(presentacion), rareza(rareza), carro_custom(*)`).eq('id_usuario', perfilData.id_usuario).order('id_carro', { ascending: false });
       if (carrosData) setMisCarros(carrosData);
 
       const { data: todosLosLogros } = await supabase.from('logro').select('*').order('id_logro', { ascending: true });
@@ -112,7 +111,6 @@ export default function MiPanelUsuario() {
       setCocheEditando(carro.id_carro);
       const idMarcaReal = marcas.find(m => m.marca === carro.marca?.marca)?.id_marca || "";
       const idSerieReal = carro.serie?.id_serie || "";
-      const idRarezaReal = rarezas.find(r => r.rareza === carro.rareza && r.id_fabricante === carro.id_fabricante)?.id_rareza || carro.rareza;
 
       let subData = null;
       if (carro.es_subasta) {
@@ -127,56 +125,56 @@ export default function MiPanelUsuario() {
         fechaCierreStr = d.toISOString().slice(0, 16);
       }
 
-      // 🛡️ REGLA: Extraemos datos sandbox si existen para pre-poblar
       const datosCustom = carro.carro_custom?.[0] || {};
-      
       const valBase = datosCustom.valor_base || "";
       const costMat = datosCustom.costo_materiales || "";
 
-      // ✨ SE MANTIENE LA LÓGICA: Pre-calculamos el valor custom con el motor actualizado
       const valorCustomPreCalculado = carro.es_custom 
         ? calcularValorAproximado(
-            carro.modelo, carro.fabricante?.fabricante, carro.rareza, "Individual Básico", parseInt(carro.serie?.anio), "Loose",
-            { valor_base: valBase, costo_materiales: costMat } // Pasamos los costos
+            carro.modelo, carro.fabricante?.fabricante, carro.rareza?.rareza, "Individual Básico", parseInt(carro.serie?.anio), "Loose",
+            { valor_base: valBase, costo_materiales: costMat }
           )
         : "";
 
+      // ✨ MAGIA: Reemplazo masivo de variables rotas por la función String() segura
       setNuevoCarro({ 
         modelo: carro.modelo || "", 
-        // Si es sandbox y el fabricante es null, usamos "nuevo". Sino, su ID.
-        id_fabricante: (carro.es_custom && !carro.id_fabricante) ? "nuevo" : (carro.id_fabricante ? carro.id_fabricante.toString() : ""), 
-        otro_fabricante: datosCustom.fabricante || "", // Nombres sandbox
-        id_marca: (carro.es_custom && !idMarcaReal) ? "nuevo" : idMarcaReal.toString(), 
-        otra_marca: datosCustom.marca || "", // Nombres sandbox
-        id_serie: (carro.es_custom && !idSerieReal) ? "nuevo" : idSerieReal.toString(), 
-        otra_serie: datosCustom.serie || "", // Nombres sandbox
-        rareza: (carro.es_custom && !rarezas.find(r => r.id_rareza === parseInt(carro.rareza))) ? "nuevo" : idRarezaReal.toString(), 
+        id_fabricante: (carro.es_custom && !carro.id_fabricante) ? "nuevo" : String(carro.id_fabricante || ""), 
+        otro_fabricante: datosCustom.fabricante || "", 
+        id_marca: (carro.es_custom && !idMarcaReal) ? "nuevo" : String(idMarcaReal || ""), 
+        otra_marca: datosCustom.marca || "", 
+        id_serie: (carro.es_custom && !idSerieReal) ? "nuevo" : String(idSerieReal || ""), 
+        otra_serie: datosCustom.serie || "", 
+        // ✨ CORRECCIÓN EXACTA DEL ERROR QUE ME MANDASTE:
+        rareza: (carro.es_custom && datosCustom.rareza) ? "nuevo" : String(carro.id_rareza || ""), 
         rareza_custom_texto: datosCustom.rareza || "", 
-        id_presentacion: (carro.es_custom && !carro.id_presentacion) ? "nuevo" : (carro.id_presentacion ? carro.id_presentacion.toString() : ""), 
+        id_presentacion: (carro.es_custom && !carro.id_presentacion) ? "nuevo" : String(carro.id_presentacion || ""), 
         otra_presentacion: datosCustom.presentacion || "Individual Básico", 
-        // 🛡️ Pre-poblamos el valor. Si es custom, usamos el valor pre-calculado, sino, su valor actual de la bóveda.
-        valor: carro.es_custom ? valorCustomPreCalculado.toString() : (carro.valor ? carro.valor.toString() : ""), 
-        id_escala: carro.escala ? carro.escala.toString() : "", 
-        id_estado_carro: carro.estado_carro ? carro.estado_carro.toString() : "", 
-        no_carro: carro.no_carro ? carro.no_carro.toString() : "", 
-        total_carros: carro.serie?.no_carros ? carro.serie.no_carros.toString() : "", 
-        // Si es custom sandbox y no tiene año de serie maestra, usamos el año sandbox
-        anio_serie: (carro.es_custom && !carro.serie?.anio && datosCustom.anio) ? datosCustom.anio.toString() : (carro.serie?.anio ? carro.serie.anio.toString() : ""), 
-        para_cambio: carro.para_cambio || false, para_venta: carro.para_venta || false, es_lote: carro.es_lote || false,
-        es_preventa: carro.es_preventa || false, fecha_llegada: carro.fecha_llegada || "", es_subasta: carro.es_subasta || false,
-        precio_inicial: subData ? subData.precio_inicial.toString() : "", incremento_minimo: subData ? subData.incremento_minimo.toString() : "10",
+        valor: carro.es_custom ? String(valorCustomPreCalculado || "") : String(carro.valor || ""), 
+        id_escala: String(carro.escala || ""), 
+        id_estado_carro: String(carro.estado_carro || ""), 
+        no_carro: String(carro.no_carro || ""), 
+        total_carros: String(carro.serie?.no_carros || ""), 
+        anio_serie: (carro.es_custom && !carro.serie?.anio && datosCustom.anio) ? String(datosCustom.anio || "") : String(carro.serie?.anio || ""), 
+        para_cambio: carro.para_cambio || false, 
+        para_venta: carro.para_venta || false, 
+        es_lote: carro.es_lote || false,
+        es_preventa: carro.es_preventa || false, 
+        fecha_llegada: carro.fecha_llegada || "", 
+        es_subasta: carro.es_subasta || false,
+        precio_inicial: String(subData?.precio_inicial || ""), 
+        incremento_minimo: subData?.incremento_minimo ? String(subData.incremento_minimo) : "10",
         fecha_cierre_subasta: fechaCierreStr,
-        // ✨ SE MANTIENE EL ESTADO CUSTOM: Seteamos los costos custom sandbox para pre-poblar
         es_custom: carro.es_custom || false,
-        valor_base: valBase.toString(), 
-        costo_materiales: costMat.toString()
+        valor_base: String(valBase || ""), 
+        costo_materiales: String(costMat || "")
       });
       setFotoPreviewCarro(carro.imagen_url || null);
       if (carro.es_lote && carro.galeria) setFotosExtraExistentes(carro.galeria); else setFotosExtraExistentes([]);
       setFotosExtraNuevas([]); setFotosExtraPreview([]);
     } else {
       setCocheEditando(null); setFotoPreviewCarro(null); setFotosExtraExistentes([]); setFotosExtraNuevas([]); setFotosExtraPreview([]);
-      setNuevoCarro(estadoInicialCarro); // Reset limpio
+      setNuevoCarro(estadoInicialCarro);
     }
     setFotoArchivoCarro(null); setIsModalOpen(true);
   };
@@ -190,14 +188,13 @@ export default function MiPanelUsuario() {
   const cerrarModal = () => { 
     setIsModalOpen(false); setCocheEditando(null); setFotoArchivoCarro(null); setFotoPreviewCarro(null); 
     setFotosExtraNuevas([]); setFotosExtraPreview([]); setFotosExtraExistentes([]);
+    setNuevoCarro(estadoInicialCarro);
   };
 
   if (cargandoDatos) return <div className="flex min-h-screen items-center justify-center text-cyan-600 bg-slate-50 animate-pulse font-bold tracking-widest">ABRIENDO PANEL...</div>;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-cyan-200 selection:text-cyan-900 pb-20">
-      
-      {/* HEADER DEL PANEL */}
       <div className="bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto p-4 md:p-8 w-full flex flex-col md:flex-row md:justify-between md:items-end gap-4">
           <div>
@@ -212,24 +209,19 @@ export default function MiPanelUsuario() {
       </div>
 
       <div className="max-w-7xl mx-auto p-4 md:p-8 w-full grid grid-cols-1 lg:grid-cols-5 gap-6 mt-4">
-        
-        {/* MENÚ LATERAL */}
         <aside className="flex flex-row lg:flex-col gap-2 lg:col-span-1 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide">
           <button onClick={() => setTabActiva("boveda")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "boveda" ? "bg-white border-2 border-cyan-500 shadow-md text-cyan-700" : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-700"}`}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg> Mi Bóveda</button>
           <button onClick={() => setTabActiva("perfil")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "perfil" ? "bg-white border-2 border-cyan-500 shadow-md text-cyan-700" : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-700"}`}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> Configurar Perfil</button>
           <button onClick={() => setTabActiva("logros")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "logros" ? "bg-white border-2 border-cyan-500 shadow-md text-cyan-700" : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-700"}`}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg> Álbum de Logros</button>
-          
           {(miPerfil?.rol === 'VENDEDOR' || miPerfil?.rol === 'SUPER_ADMIN') && (
             <>
               <button onClick={() => setTabActiva("rafaga")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "rafaga" ? "bg-amber-50 border-2 border-amber-500 shadow-md text-amber-700" : "bg-transparent text-slate-500 hover:bg-amber-100/50 hover:text-amber-700"}`}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg> Subida Masiva (PRO)</button>
               <button onClick={() => setTabActiva("radar")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "radar" ? "bg-red-50 border-2 border-red-500 shadow-md text-red-700" : "bg-transparent text-slate-500 hover:bg-red-50 hover:text-red-700"}`}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg> Radar de Clientes</button>
             </>
           )}
-
           <button onClick={() => setTabActiva("feedback")} className={`whitespace-nowrap text-left px-5 py-3.5 rounded-2xl font-bold transition-all flex items-center gap-3 ${tabActiva === "feedback" ? "bg-indigo-50 border-2 border-indigo-500 shadow-md text-indigo-700" : "bg-transparent text-slate-500 hover:bg-indigo-50 hover:text-indigo-700"}`}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg> Soporte / Ideas</button>
         </aside>
 
-        {/* ÁREA PRINCIPAL */}
         <main className="lg:col-span-4 bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-xl shadow-slate-200/50 min-h-[600px]">
           {tabActiva === "boveda" && <TabBoveda misCarros={misCarros} abrirModalCarro={abrirModalCarro} eliminarCarro={eliminarCarro} />}
           {tabActiva === "perfil" && <TabPerfil miPerfil={miPerfil} estadosMexico={estadosMexico} cargarDatosCentrales={cargarDatosCentrales} />}

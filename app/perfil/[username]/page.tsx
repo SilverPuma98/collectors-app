@@ -94,10 +94,10 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
     );
   }
 
-  // 2. Buscamos sus autos públicos
+  // 2. ✨ ACTUALIZACIÓN MAESTRA: Añadimos rareza(rareza) y carro_custom(*)
   const { data: carros } = await supabase
     .from('carro')
-    .select('*, marca(marca), presentacion(presentacion)')
+    .select('*, marca(marca), presentacion(presentacion), rareza(rareza), carro_custom(*)')
     .eq('id_usuario', perfil.id_usuario)
     .eq('estado_aprobacion', 'APROBADO')
     .order('id_carro', { ascending: false });
@@ -337,25 +337,37 @@ export default async function PerfilUsuario({ params }: { params: Promise<{ user
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-            {carros.map((carro) => (
-              <Link key={carro.id_carro} href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200 relative group">
-                {carro.es_lote && <div className="absolute top-2 left-2 z-20 bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">📦 LOTE</div>}
-                {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">💲 VENTA</div>}
-                {carro.es_preventa && <div className="absolute top-2 right-2 z-20 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
-                {carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
-                {!carro.para_venta && carro.para_cambio && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">CAMBIO</div>}
-                
-                <CollectorCard 
-                  modelo={carro.modelo} 
-                  marca={carro.marca?.marca || "Desconocida"} 
-                  rareza={carro.rareza || "Estándar"} 
-                  presentacion={carro.presentacion?.presentacion} 
-                  valor={carro.valor} 
-                  valorCalculado={carro.valor_calculado} 
-                  imagenUrl={carro.imagen_url} 
-                />
-              </Link>
-            ))}
+            {carros.map((carro) => {
+              
+              // ✨ EXTRACCIÓN INTELIGENTE BLINDADA
+              const datosCustom = carro.carro_custom?.[0] || {};
+              const nombreMarca = (carro.es_custom && datosCustom.marca) ? datosCustom.marca : (carro.marca?.marca || "Desconocida");
+              const nombrePres = (carro.es_custom && datosCustom.presentacion) ? datosCustom.presentacion : carro.presentacion?.presentacion;
+              
+              const rRaw = carro.es_custom && datosCustom.rareza ? datosCustom.rareza : carro.rareza;
+              const nombreRareza = typeof rRaw === 'object' ? (rRaw?.rareza || "Común") : (rRaw || "Común");
+
+              return (
+                <Link key={carro.id_carro} href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200 relative group">
+                  {carro.es_lote && !carro.es_custom && <div className="absolute top-2 left-2 z-20 bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">📦 LOTE</div>}
+                  {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">💲 VENTA</div>}
+                  {carro.es_preventa && <div className="absolute top-2 right-2 z-20 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
+                  {carro.es_subasta && <div className="absolute top-2 right-2 z-20 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
+                  {!carro.para_venta && carro.para_cambio && !carro.es_custom && <div className="absolute top-2 left-2 z-20 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md">CAMBIO</div>}
+                  
+                  <CollectorCard 
+                    modelo={carro.modelo} 
+                    marca={nombreMarca} 
+                    rareza={String(nombreRareza)} 
+                    presentacion={nombrePres} 
+                    valor={carro.valor} 
+                    valorCalculado={carro.valor_calculado} 
+                    imagenUrl={carro.imagen_url} 
+                    esCustom={carro.es_custom} 
+                  />
+                </Link>
+              );
+            })}
           </div>
         )}
         

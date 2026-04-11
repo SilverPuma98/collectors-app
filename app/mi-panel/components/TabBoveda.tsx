@@ -20,16 +20,19 @@ export default function TabBoveda({
     if (!busqueda) return true;
     const termino = busqueda.toLowerCase();
     
-    // Leemos datos maestros o los datos del sandbox si es custom
     const datosCustom = carro.carro_custom?.[0] || {};
     const nombreMarca = carro.es_custom && datosCustom.marca ? datosCustom.marca : carro.marca?.marca;
     const nombreSerie = carro.es_custom && datosCustom.serie ? datosCustom.serie : carro.serie?.serie;
     const nombreFabricante = carro.es_custom && datosCustom.fabricante ? datosCustom.fabricante : carro.fabricante?.fabricante;
     
+    // 🛡️ BLINDAJE 1: Extracción segura para el buscador
+    const rRaw = carro.es_custom && datosCustom.rareza ? datosCustom.rareza : carro.rareza;
+    const nombreRareza = typeof rRaw === 'object' ? rRaw?.rareza : rRaw;
+
     return carro.modelo?.toLowerCase().includes(termino) || 
            nombreMarca?.toLowerCase().includes(termino) || 
            nombreSerie?.toLowerCase().includes(termino) || 
-           carro.rareza?.toLowerCase().includes(termino) || 
+           nombreRareza?.toLowerCase().includes(termino) || 
            nombreFabricante?.toLowerCase().includes(termino);
   });
 
@@ -52,11 +55,13 @@ export default function TabBoveda({
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
           {carrosFiltrados.map((carro) => {
-            // ✨ Extracción inteligente de nombres (Maestros vs Custom Sandbox)
             const datosCustom = carro.carro_custom?.[0] || {};
             const nombreMarca = carro.es_custom && datosCustom.marca ? datosCustom.marca : (carro.marca?.marca || "Sin Marca");
             const nombrePres = carro.es_custom && datosCustom.presentacion ? datosCustom.presentacion : carro.presentacion?.presentacion;
-            const nombreRareza = carro.es_custom && datosCustom.rareza ? datosCustom.rareza : (carro.rareza || "Común");
+            
+            // 🛡️ BLINDAJE 2: Extracción segura para la tarjeta (Obligamos a que sea texto)
+            const rRaw = carro.es_custom && datosCustom.rareza ? datosCustom.rareza : carro.rareza;
+            const nombreRareza = typeof rRaw === 'object' ? (rRaw?.rareza || "Común") : (rRaw || "Común");
             
             return (
               <div 
@@ -80,15 +85,16 @@ export default function TabBoveda({
                   <Link href={`/pieza/${carro.id_carro}`} onClick={(e) => e.stopPropagation()} className="w-full max-w-[120px] bg-cyan-600 text-white py-2 rounded-lg shadow-lg font-bold text-xs text-center hover:bg-cyan-500 mt-2 transition-transform active:scale-95">Detalles</Link>
                 </div>
                 
+                {/* Envolvemos en String() por si acaso para que React JAMÁS vuelva a quejarse */}
                 <CollectorCard 
                   modelo={carro.modelo} 
                   marca={nombreMarca} 
-                  rareza={nombreRareza} 
+                  rareza={String(nombreRareza)} 
                   presentacion={nombrePres}
                   valor={carro.valor} 
                   valorCalculado={carro.valor_calculado} 
                   imagenUrl={carro.imagen_url} 
-                  esCustom={carro.es_custom} // ✨ Pasamos la bandera a la tarjeta visual
+                  esCustom={carro.es_custom} 
                 />
               </div>
             );
