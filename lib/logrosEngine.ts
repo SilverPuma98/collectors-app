@@ -12,20 +12,20 @@ export async function evaluarLogros(idUsuario: number) {
     { cookies: { get(name: string) { return cookieStore.get(name)?.value; } } }
   );
 
-  // 1. Extraer los autos del usuario
   const { data: misCarros } = await supabase
     .from('carro')
     .select(`
-      modelo, rareza, valor_calculado, para_venta, para_cambio, id_fabricante,
+      modelo, valor_calculado, para_venta, para_cambio, id_fabricante, es_custom,
       serie(anio),
       estado_carro_rel:estado_carro(estado_carro),
-      fabricante_rel:fabricante(fabricante)
+      fabricante_rel:fabricante(fabricante),
+      rareza_rel:rareza(rareza),
+      carro_custom(rareza)
     `)
     .eq('id_usuario', idUsuario);
 
   if (!misCarros) return [];
 
-  // 2. Extraer logros actuales
   const { data: logrosActuales } = await supabase
     .from('usuario_logro')
     .select('logro(codigo_regla)')
@@ -33,12 +33,11 @@ export async function evaluarLogros(idUsuario: number) {
     
   const codigosDesbloqueados = logrosActuales?.map((item: any) => item.logro.codigo_regla) || [];
 
-  // 3. Catálogo de logros
   const { data: catalogoLogros } = await supabase.from('logro').select('*');
   if (!catalogoLogros) return [];
 
   // ====================================================================
-  // 🧠 FASE 1: CONTADORES MASIVOS (Escaneo de Bóveda)
+  // 🧠 FASE 1: CONTADORES MASIVOS MEJORADOS
   // ====================================================================
   const stats = {
     total: misCarros.length,
@@ -53,12 +52,12 @@ export async function evaluarLogros(idUsuario: number) {
     marcasUnicas: new Set<number>()
   };
 
-  // SOLUCIÓN TS: Forzamos el tipo 'any' para evitar inferencias estrictas de Supabase
   misCarros.forEach((c: any) => {
     const mod = (c.modelo || '').toLowerCase();
-    const rar = (c.rareza || '').toLowerCase();
     
-    // Extracción segura en caso de que Supabase retorne Arrays en las relaciones
+    const rRaw = c.es_custom && c.carro_custom?.[0]?.rareza ? c.carro_custom[0].rareza : c.rareza_rel;
+    const rar = (typeof rRaw === 'object' ? (rRaw?.rareza || "") : (rRaw || "")).toLowerCase();
+    
     const estadoObj = Array.isArray(c.estado_carro_rel) ? c.estado_carro_rel[0] : c.estado_carro_rel;
     const est = (estadoObj?.estado_carro || '').toLowerCase();
     
@@ -72,51 +71,51 @@ export async function evaluarLogros(idUsuario: number) {
     
     if (c.id_fabricante) stats.marcasUnicas.add(c.id_fabricante);
 
-    // Valores
     stats.valorTotal += val;
     if (val > stats.topValor) stats.topValor = val;
 
-    // Fabricantes
-    if (fab.includes('hot wheels')) stats.hw++;
-    if (fab.includes('matchbox')) stats.mbx++;
-    if (fab.includes('m2')) stats.m2++;
-    if (fab.includes('greenlight')) stats.gl++;
-    if (fab.includes('mini gt') || fab.includes('minigt')) stats.mgt++;
-    if (fab.includes('jada')) stats.jada++;
-    if (fab.includes('tomica')) stats.tomica++;
-    if (fab.includes('kaido')) stats.kaido++;
-    if (fab.includes('inno')) stats.inno++;
+    // 🚀 FABRICANTES (Escáner Agresivo)
+    if (fab.includes('hot wheels') || fab.includes('hw')) stats.hw++;
+    if (fab.includes('matchbox') || fab.includes('mbx')) stats.mbx++;
+    if (fab.includes('m2') || fab.includes('m2 machines')) stats.m2++;
+    if (fab.includes('greenlight') || fab.includes('green light')) stats.gl++;
+    if (fab.includes('mini gt') || fab.includes('minigt') || fab.includes('mini-gt')) stats.mgt++;
+    if (fab.includes('jada') || fab.includes('jada toys')) stats.jada++;
+    if (fab.includes('tomica') || fab.includes('tomy')) stats.tomica++;
+    if (fab.includes('kaido') || fab.includes('kaidohouse')) stats.kaido++;
+    if (fab.includes('inno') || fab.includes('inno64')) stats.inno++;
 
-    // Modelos / Temáticas
-    if (['skyline', 'gt-r', 'gtr', 'supra', 'rx-7', 'civic', 'datsun', 'nsx', 'ae86'].some(k => mod.includes(k))) stats.jdm++;
-    if (['mustang', 'camaro', 'charger', 'challenger', 'corvette', 'shelby', 'bel air'].some(k => mod.includes(k))) stats.muscle++;
-    if (['bmw', 'audi', 'mercedes', 'volkswagen', 'porsche', 'ferrari', 'lamborghini'].some(k => mod.includes(k))) stats.euro++;
-    if (mod.includes('ferrari')) stats.ferrari++;
-    if (mod.includes('porsche') || mod.includes('911')) stats.porsche++;
-    if (mod.includes('lamborghini') || mod.includes('countach') || mod.includes('huracan')) stats.lambo++;
-    if (mod.includes('nissan') || mod.includes('datsun') || mod.includes('skyline')) stats.nissan++;
-    if (mod.includes('ford') || mod.includes('mustang') || mod.includes('bronco')) stats.ford++;
-    if (mod.includes('vw') || mod.includes('volkswagen') || mod.includes('kombi') || mod.includes('beetle')) stats.vw++;
-    if (mod.includes('chevy') || mod.includes('chevrolet') || mod.includes('camaro')) stats.chevy++;
+    // 🏎️ TEMÁTICAS (Diccionario Expandido)
+    if (['skyline', 'gt-r', 'gtr', 'supra', 'rx-7', 'rx7', 'civic', 'datsun', 'nsx', 'ae86', 's2000', 'impreza', 'wrx', 'evo', 'evolution', 'silvia', 's13', 's14', 's15', '350z', '370z', 'fairlady'].some(k => mod.includes(k))) stats.jdm++;
+    if (['mustang', 'camaro', 'charger', 'challenger', 'corvette', 'shelby', 'bel air', 'pontiac', 'gto', 'firebird', 'plymouth', 'barracuda', 'viper'].some(k => mod.includes(k))) stats.muscle++;
+    if (['bmw', 'audi', 'mercedes', 'benz', 'volkswagen', 'porsche', 'ferrari', 'lamborghini', 'mclaren', 'aston', 'bugatti', 'renault', 'peugeot', 'pagani'].some(k => mod.includes(k))) stats.euro++;
+    
+    if (mod.includes('ferrari') || mod.includes('enzo') || mod.includes('f40') || mod.includes('testarossa')) stats.ferrari++;
+    if (mod.includes('porsche') || mod.includes('911') || mod.includes('carrera') || mod.includes('gt3')) stats.porsche++;
+    if (mod.includes('lamborghini') || mod.includes('countach') || mod.includes('huracan') || mod.includes('aventador') || mod.includes('diablo')) stats.lambo++;
+    if (mod.includes('nissan') || mod.includes('datsun') || mod.includes('skyline') || mod.includes('silvia')) stats.nissan++;
+    if (mod.includes('ford') || mod.includes('mustang') || mod.includes('bronco') || mod.includes('raptor') || mod.includes('gt40')) stats.ford++;
+    if (mod.includes('vw') || mod.includes('volkswagen') || mod.includes('kombi') || mod.includes('beetle') || mod.includes('golf') || mod.includes('vocho')) stats.vw++;
+    if (mod.includes('chevy') || mod.includes('chevrolet') || mod.includes('camaro') || mod.includes('corvette') || mod.includes('silverado')) stats.chevy++;
 
-    // Rarezas
-    if (rar.includes('treasure hunt') && !rar.includes('super')) stats.th++;
-    if (rar.includes('super treasure') || rar.includes('sth')) stats.sth++;
-    if (rar.includes('chase') || rar.includes('white lightning') || rar.includes('green machine')) stats.chase++;
-    if (rar.includes('rlc') || rar.includes('convention')) stats.rlc++;
-    if (rar.includes('premium') || rar.includes('car culture')) stats.premium++;
+    // 💎 RAREZAS (Escáner Agresivo)
+    if ((rar.includes('treasure hunt') || rar.includes('th')) && !rar.includes('super') && !rar.includes('sth')) stats.th++;
+    if (rar.includes('super treasure') || rar.includes('sth') || rar.includes('super t-hunt')) stats.sth++;
+    if (rar.includes('chase') || rar.includes('white lightning') || rar.includes('green machine') || rar.includes('raw')) stats.chase++;
+    if (rar.includes('rlc') || rar.includes('convention') || rar.includes('red line club')) stats.rlc++;
+    if (rar.includes('premium') || rar.includes('car culture') || rar.includes('boulevard') || rar.includes('elite')) stats.premium++;
 
-    // Estado Físico
-    if (est.includes('blíster')) stats.mint++;
-    if (est.includes('loose') || (est.includes('buena condición') && !est.includes('blíster'))) stats.loose++;
-    if (est.includes('chatarra') || est.includes('mal estado')) stats.junk++;
+    // 📦 ESTADO FÍSICO
+    if (est.includes('blíster') || est.includes('blister') || est.includes('sellado') || est.includes('caja') || est.includes('tarjeta')) stats.mint++;
+    if (est.includes('loose') || est.includes('suelto') || (est.includes('condición') && !est.includes('blíster'))) stats.loose++;
+    if (est.includes('chatarra') || est.includes('mal estado') || est.includes('junk')) stats.junk++;
 
-    // Comercio
+    // 🤝 COMERCIO
     if (c.para_venta) stats.venta++;
     else if (c.para_cambio) stats.cambio++;
     else stats.exhibicion++;
 
-    // Décadas
+    // 📅 DÉCADAS
     if (anio >= 1970 && anio <= 1979) stats.d70s++;
     if (anio >= 1980 && anio <= 1989) stats.d80s++;
     if (anio >= 1990 && anio <= 1999) stats.d90s++;
@@ -244,7 +243,6 @@ export async function evaluarLogros(idUsuario: number) {
   for (const logro of catalogoLogros) {
     if (codigosDesbloqueados.includes(logro.codigo_regla)) continue;
 
-    // Si la regla existe en el diccionario y devuelve TRUE, lo otorgamos
     if (reglas[logro.codigo_regla] && reglas[logro.codigo_regla]()) {
       nuevosLogrosAInsertar.push({ id_usuario: idUsuario, id_logro: logro.id_logro });
       nombresLogrosGanados.push(logro.nombre);

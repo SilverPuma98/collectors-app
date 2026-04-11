@@ -38,6 +38,7 @@ export default function TabRafaga({
        const mod = campo === 'modelo' ? valorStr : copia[index].modelo;
        const idMar = campo === 'id_marca' ? valorStr : copia[index].id_marca;
        if (mod && idMar) {
+         // Usamos nombres base para la IA
          const precioSugerido = calcularValorAproximado(mod, "Hot Wheels", "Común", "Individual Básico", new Date().getFullYear(), "Blíster Excelente Condición");
          copia[index].valor = precioSugerido.toString();
        }
@@ -58,6 +59,20 @@ export default function TabRafaga({
     setSubiendoRafaga(true);
     let errores = 0;
 
+    // ✨ MAGIA TÁCTICA: Buscamos los IDs de los catálogos por defecto para la Ráfaga
+    const { data: hwFab } = await supabase.from('fabricante').select('id_fabricante').ilike('fabricante', 'Hot Wheels').single();
+    const idFabricanteBase = hwFab?.id_fabricante || null;
+
+    const { data: comunRar } = await supabase.from('rareza').select('id_rareza').ilike('rareza', 'Común').single();
+    const idRarezaBase = comunRar?.id_rareza || null;
+
+    const { data: presBasic } = await supabase.from('presentacion').select('id_presentacion').ilike('presentacion', 'Individual Básico').single();
+    const idPresentacionBase = presBasic?.id_presentacion || null;
+
+    const { data: blisterEst } = await supabase.from('estado_carro').select('id_estado_carro').ilike('estado_carro', 'Blíster Excelente Condición').single();
+    const idEstadoBase = blisterEst?.id_estado_carro || null;
+
+
     for (const item of archivosRafaga) {
       try {
         const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true, initialQuality: 0.85 };
@@ -70,11 +85,21 @@ export default function TabRafaga({
         
         const precioSugeridoIA = calcularValorAproximado(item.modelo, "Hot Wheels", "Común", "Individual Básico", new Date().getFullYear(), "Blíster Excelente Condición");
 
+        // ✨ ACTUALIZACIÓN MAESTRA: Usamos los IDs en el payload y eliminamos la columna de texto vieja 'rareza'
         const payload = {
-          id_usuario: miPerfil.id_usuario, modelo: item.modelo, marca: parseInt(item.id_marca) || null, 
+          id_usuario: miPerfil.id_usuario, 
+          modelo: item.modelo, 
+          marca: parseInt(item.id_marca) || null, 
+          id_fabricante: idFabricanteBase,
+          id_rareza: idRarezaBase,
+          id_presentacion: idPresentacionBase,
+          estado_carro: idEstadoBase,
           valor: parseFloat(item.valor) || 0,
           valor_calculado: precioSugeridoIA, 
-          imagen_url: urlData.publicUrl, estado_aprobacion: 'APROBADO', para_venta: true, para_cambio: false 
+          imagen_url: urlData.publicUrl, 
+          estado_aprobacion: 'APROBADO', 
+          para_venta: true, 
+          para_cambio: false 
         };
 
         const { error } = await supabase.from('carro').insert([payload]);
