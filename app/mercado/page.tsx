@@ -20,10 +20,10 @@ export default function MarketplacePage() {
   }, []);
 
   const cargarMercado = async () => {
-    // 🧠 TRAEMOS TAMBIÉN "es_fundador" DEL USUARIO Y LA BANDERA "es_subasta" DEL CARRO
+    // ✨ ACTUALIZACIÓN: Traemos "carro_custom(*)" para leer los datos del sandbox
     const { data } = await supabase
       .from('carro')
-      .select('*, marca(marca), presentacion(presentacion), usuario(nombre_usuario, link_img_perf, rol, es_fundador)')
+      .select('*, marca(marca), presentacion(presentacion), usuario(nombre_usuario, link_img_perf, rol, es_fundador), carro_custom(*)')
       .eq('estado_aprobacion', 'APROBADO')
       .or('para_venta.eq.true,para_cambio.eq.true')
       .order('id_carro', { ascending: false });
@@ -37,11 +37,16 @@ export default function MarketplacePage() {
     // 1. Filtro por Modalidad (Venta o Cambio)
     const coincideTab = tabActiva === "venta" ? p.para_venta : p.para_cambio;
     
+    // ✨ Extracción inteligente para la búsqueda (Maestros vs Custom Sandbox)
+    const datosCustom = p.carro_custom?.[0] || {};
+    const nombreMarca = (p.es_custom && datosCustom.marca) ? datosCustom.marca : p.marca?.marca;
+    const nombreRareza = (p.es_custom && datosCustom.rareza) ? datosCustom.rareza : p.rareza;
+
     // 2. Filtro por Búsqueda (Modelo o Marca)
     const coincideBusqueda = 
       (p.modelo || "").toLowerCase().includes(busqueda.toLowerCase()) || 
-      (p.marca?.marca || "").toLowerCase().includes(busqueda.toLowerCase()) ||
-      (p.rareza || "").toLowerCase().includes(busqueda.toLowerCase());
+      (nombreMarca || "").toLowerCase().includes(busqueda.toLowerCase()) ||
+      (nombreRareza || "").toLowerCase().includes(busqueda.toLowerCase());
 
     // 3. Filtro por Precio (Solo aplica si estamos en Venta)
     const min = precioMin ? parseFloat(precioMin) : 0;
@@ -109,53 +114,63 @@ export default function MarketplacePage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-            {piezasFiltradas.map((p) => (
-              <div key={p.id_carro} className="flex flex-col h-full group hover:-translate-y-2 transition-transform duration-300">
-                <Link href={`/pieza/${p.id_carro}`} className="relative flex-1 block">
-                  
-                  {/* 📦 LADO IZQUIERDO: Lote / Cambio */}
-                  <div className="absolute top-2 left-2 z-20 flex flex-col gap-1 items-start">
-                    {p.es_lote && <span className="bg-purple-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">📦 Lote</span>}
-                    {p.para_cambio && <span className="bg-emerald-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">Cambio</span>}
-                  </div>
+            {piezasFiltradas.map((p) => {
+              
+              // ✨ Extracción inteligente de nombres (Maestros vs Custom Sandbox)
+              const datosCustom = p.carro_custom?.[0] || {};
+              const nombreMarca = (p.es_custom && datosCustom.marca) ? datosCustom.marca : (p.marca?.marca || "Desconocida");
+              const nombrePres = (p.es_custom && datosCustom.presentacion) ? datosCustom.presentacion : p.presentacion?.presentacion;
+              const nombreRareza = (p.es_custom && datosCustom.rareza) ? datosCustom.rareza : (p.rareza || "Estándar");
 
-                  {/* ⏳ LADO DERECHO: Venta / Preventa / Subasta */}
-                  <div className="absolute top-2 right-2 z-20 flex flex-col gap-1 items-end">
-                    {p.para_venta && !p.es_preventa && !p.es_subasta && <span className="bg-amber-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">En Venta</span>}
-                    {p.es_preventa && <span className="bg-indigo-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-md uppercase animate-pulse shadow-indigo-500/50">⏳ Preventa</span>}
-                    {p.es_subasta && <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-md uppercase animate-bounce shadow-rose-500/50">🔨 Subasta</span>}
-                  </div>
-                  
-                  <CollectorCard 
-                    modelo={p.modelo} 
-                    marca={p.marca?.marca || "Desconocida"} 
-                    rareza={p.rareza || "Estándar"} 
-                    presentacion={p.presentacion?.presentacion}
-                    valor={p.valor} 
-                    valorCalculado={p.valor_calculado} 
-                    imagenUrl={p.imagen_url} 
-                  />
-                  <div className="absolute inset-0 rounded-2xl ring-2 ring-transparent group-hover:ring-cyan-500/50 transition-all pointer-events-none z-10"></div>
-                </Link>
+              return (
+                <div key={p.id_carro} className="flex flex-col h-full group hover:-translate-y-2 transition-transform duration-300">
+                  <Link href={`/pieza/${p.id_carro}`} className="relative flex-1 block">
+                    
+                    {/* 📦 LADO IZQUIERDO: Lote / Cambio */}
+                    <div className="absolute top-2 left-2 z-20 flex flex-col gap-1 items-start">
+                      {p.es_lote && !p.es_custom && <span className="bg-purple-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">📦 Lote</span>}
+                      {p.para_cambio && !p.es_custom && <span className="bg-emerald-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">Cambio</span>}
+                    </div>
 
-                {/* Info del Vendedor (Debajo de la tarjeta) */}
-                <Link href={`/perfil/${p.usuario?.nombre_usuario}`} className="mt-3 flex items-center gap-2 px-1 hover:opacity-80 transition-opacity">
-                  {/* 👑 SI ES FUNDADOR, Borde Dorado, de lo contrario normal */}
-                  <div className={`w-6 h-6 rounded-full overflow-hidden shrink-0 border ${p.usuario?.es_fundador ? 'border-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]' : (p.usuario?.rol === 'VENDEDOR' ? 'border-amber-500' : 'border-slate-700')} bg-slate-800`}>
-                    {p.usuario?.link_img_perf ? <img src={p.usuario.link_img_perf} className="w-full h-full object-cover"/> : <svg className="w-full h-full p-1 text-slate-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
-                  </div>
-                  <div className="truncate">
-                    <p className="text-[10px] text-slate-500 font-bold leading-none">Ofrecido por</p>
-                    <p className="text-xs text-slate-300 font-black truncate group-hover:text-cyan-400 transition-colors flex items-center gap-0.5">
-                      @{p.usuario?.nombre_usuario || 'Anónimo'} 
-                      {p.usuario?.rol === 'VENDEDOR' && !p.usuario?.es_fundador && <span className="text-amber-500 ml-0.5">✓</span>}
-                      {/* 👑 CORONA DE FUNDADOR AL LADO DEL NOMBRE */}
-                      {p.usuario?.es_fundador && <span className="text-amber-400 ml-0.5 text-xs drop-shadow-[0_0_2px_rgba(251,191,36,0.8)]">👑</span>}
-                    </p>
-                  </div>
-                </Link>
-              </div>
-            ))}
+                    {/* ⏳ LADO DERECHO: Venta / Preventa / Subasta */}
+                    <div className="absolute top-2 right-2 z-20 flex flex-col gap-1 items-end">
+                      {p.para_venta && !p.es_preventa && !p.es_subasta && <span className="bg-amber-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded shadow-md uppercase">En Venta</span>}
+                      {p.es_preventa && <span className="bg-indigo-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-md uppercase animate-pulse shadow-indigo-500/50">⏳ Preventa</span>}
+                      {p.es_subasta && <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-md uppercase animate-bounce shadow-rose-500/50">🔨 Subasta</span>}
+                    </div>
+                    
+                    <CollectorCard 
+                      modelo={p.modelo} 
+                      marca={nombreMarca} 
+                      rareza={nombreRareza} 
+                      presentacion={nombrePres}
+                      valor={p.valor} 
+                      valorCalculado={p.valor_calculado} 
+                      imagenUrl={p.imagen_url} 
+                      esCustom={p.es_custom} // ✨ Enviamos la bandera para prender la etiqueta amarilla
+                    />
+                    <div className="absolute inset-0 rounded-2xl ring-2 ring-transparent group-hover:ring-cyan-500/50 transition-all pointer-events-none z-10"></div>
+                  </Link>
+
+                  {/* Info del Vendedor (Debajo de la tarjeta) */}
+                  <Link href={`/perfil/${p.usuario?.nombre_usuario}`} className="mt-3 flex items-center gap-2 px-1 hover:opacity-80 transition-opacity">
+                    {/* 👑 SI ES FUNDADOR, Borde Dorado, de lo contrario normal */}
+                    <div className={`w-6 h-6 rounded-full overflow-hidden shrink-0 border ${p.usuario?.es_fundador ? 'border-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]' : (p.usuario?.rol === 'VENDEDOR' ? 'border-amber-500' : 'border-slate-700')} bg-slate-800`}>
+                      {p.usuario?.link_img_perf ? <img src={p.usuario.link_img_perf} className="w-full h-full object-cover"/> : <svg className="w-full h-full p-1 text-slate-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
+                    </div>
+                    <div className="truncate">
+                      <p className="text-[10px] text-slate-500 font-bold leading-none">Ofrecido por</p>
+                      <p className="text-xs text-slate-300 font-black truncate group-hover:text-cyan-400 transition-colors flex items-center gap-0.5">
+                        @{p.usuario?.nombre_usuario || 'Anónimo'} 
+                        {p.usuario?.rol === 'VENDEDOR' && !p.usuario?.es_fundador && <span className="text-amber-500 ml-0.5">✓</span>}
+                        {/* 👑 CORONA DE FUNDADOR AL LADO DEL NOMBRE */}
+                        {p.usuario?.es_fundador && <span className="text-amber-400 ml-0.5 text-xs drop-shadow-[0_0_2px_rgba(251,191,36,0.8)]">👑</span>}
+                      </p>
+                    </div>
+                  </Link>
+                </div>
+              );
+            })}
           </div>
         )}
 

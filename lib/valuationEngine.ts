@@ -50,15 +50,19 @@ export function calcularValorAproximado(
 
   // --- 📦 LÓGICA DE PRECIOS BASE SEGÚN LA PRESENTACIÓN ---
   // Reemplaza el P_retail si viene en un empaque especial
-  if (pres.includes('5-pack') || pres.includes('5 pack') || pres.includes('multipack')) P_retail = 200;
+  if (pres.includes('5-pack') || pres.includes('5 pack')) P_retail = 200;
   else if (pres.includes('3-pack') || pres.includes('3 pack')) P_retail = 120;
   else if (pres.includes('team transport')) P_retail = 350;
-  else if (pres.includes('premium box')) P_retail = 700;
+  else if (pres.includes('collector multipack') || pres.includes('multipack')) P_retail = 600;
+  else if (pres.includes('premium box')) P_retail = 1050;
   else if (pres.includes('premium') || pres.includes('car culture')) P_retail = 150;
   else if (pres.includes('diorama') || pres.includes('box set')) P_retail = 650;
   else if (pres.includes('moving parts')) P_retail = 120;
   else if (pres.includes('silver series')) P_retail = 120;
+  else if (pres.includes('rlc') || pres.includes('red line club') || pres.includes('red line club')) P_retail = 650;
+  else if (pres.includes('ultra hots')) P_retail = 120;
   else if (pres.includes('brick') || pres.includes('mega construx')) P_retail = 350;
+  else if (pres.includes('convention') || pres.includes('convencion')) P_retail = 950;
   // 🚨 CORRECCIÓN: Convertido a minúsculas para que el motor pueda leerlo
   else if (pres.includes('uniquely identifiable')) P_retail = 90;
 
@@ -67,9 +71,7 @@ export function calcularValorAproximado(
   const rar = (rareza || "").toLowerCase();
   
   // Nivel Dios (RLC, Convenciones limitadas)
-  if (rar.includes('rlc') || rar.includes('red line club') || rar.includes('convention')) Q = 25.0;
-  // Nivel Leyenda (STH de Hot Wheels)
-  else if (rar.includes('super treasure') || rar.includes('sth') || rar.includes('súper treasure')) Q = 15.0;
+  if (rar.includes('super treasure') || rar.includes('sth') || rar.includes('súper treasure')) Q = 15.0;
   // Nivel Raw / Súper Chase (Piezas sin pintar de M2, Chase 1/1 de Kaido)
   else if (rar.includes('raw') || rar.includes('super chase')) Q = 12.0;
   // Nivel Chase General (M2 Gold/Black, Matchbox Super Chase, Mini GT, White Lightning)
@@ -77,7 +79,7 @@ export function calcularValorAproximado(
   // Nivel Exclusivo de Tienda (Zamac, Red Edition, MiJo Exclusives)
   else if (rar.includes('exclusiv') || rar.includes('mijo') || rar.includes('zamac') || rar.includes('red edition')) Q = 4.0;
   // Nivel Treasure Hunt Básico
-  else if (rar.includes('treasure hunt') || rar.includes('th')) Q = 3.0;
+  else if (rar.includes('treasure hunt') || rar.includes('th')) Q = 2.0;
   else if (rar.includes('fast & furious')) Q = 2.0;
 
   // 3. Condición / Estado Físico (C) 
@@ -109,7 +111,7 @@ export function calcularValorAproximado(
     'chevy c10', 'silverado', 'f-150', 'raptor', 'bronco', 'bel air', 'impala', 'nova',
     'jeep', 'wrangler', 'rubicon', 'gladiator', 'land rover', 'defender', 'toyota land cruiser', '4runner', 'tacoma',
     'bmw', 'm3', 'm4', 'm5', 'e30', 'e46', 'vw', 'volkswagen', 'beetle', 'vocho', 'golf gti', 'scirocco',
-    'mercedes', 'amg', 'g-wagon', 'audi', 'rs6', 'quattro', 'alfa romeo', 'giulia', 'batmobile'
+    'mercedes', 'amg', 'g-wagon', 'audi', 'rs6', 'quattro', 'alfa romeo', 'giulia', 'batmobile', 'batman'
   ];
   
   if (highDemand.some(k => modelo.toLowerCase().includes(k))) D = 1.4;

@@ -39,7 +39,6 @@ export default function HomeFeed() {
         }
 
         if (perfil.id_mun) {
-          // 🧠 INCLUIMOS "es_fundador" EN LA CONSULTA DE TIENDAS LOCALES
           const { data: tiendas } = await supabase
             .from('usuario')
             .select('id_usuario, nombre_usuario, link_img_perf, rol, es_fundador')
@@ -56,10 +55,10 @@ export default function HomeFeed() {
       }
     }
 
-    // 🧠 INCLUIMOS "es_fundador" EN LA CONSULTA DE COCHES
+    // ✨ ACTUALIZACIÓN: Incluimos carro_custom(*) en el Select principal
     const { data: coches } = await supabase
       .from('carro')
-      .select(`*, marca(marca), serie(serie), presentacion(presentacion), usuario:id_usuario (nombre_usuario, link_img_perf, rol, es_fundador)`)
+      .select(`*, marca(marca), serie(serie), presentacion(presentacion), usuario:id_usuario (nombre_usuario, link_img_perf, rol, es_fundador), carro_custom(*)`)
       .eq('estado_aprobacion', 'APROBADO')
       .order('id_carro', { ascending: false })
       .limit(100);
@@ -116,12 +115,16 @@ export default function HomeFeed() {
 
   const realizarBusqueda = async (texto: string) => {
     setBuscando(true);
-    // 🧠 INCLUIMOS "es_fundador" EN LA BÚSQUEDA DE USUARIOS
     const resUsu = await supabase.from('usuario').select('id_usuario, nombre_usuario, link_img_perf, rol, es_fundador').ilike('nombre_usuario', `%${texto}%`).limit(10);
     if (resUsu.data) setUsuariosEncontrados(resUsu.data);
 
-    // 🧠 INCLUIMOS "es_fundador" EN LA BÚSQUEDA DE COCHES
-    const resCar = await supabase.from('carro').select(`*, marca(marca), serie(serie), presentacion(presentacion), usuario:id_usuario (nombre_usuario, link_img_perf, es_fundador)`).eq('estado_aprobacion', 'APROBADO').or(`modelo.ilike.%${texto}%,rareza.ilike.%${texto}%`).limit(20);
+    // ✨ ACTUALIZACIÓN: Incluimos carro_custom(*) en la búsqueda dinámica
+    const resCar = await supabase.from('carro')
+      .select(`*, marca(marca), serie(serie), presentacion(presentacion), usuario:id_usuario (nombre_usuario, link_img_perf, es_fundador), carro_custom(*)`)
+      .eq('estado_aprobacion', 'APROBADO')
+      .or(`modelo.ilike.%${texto}%,rareza.ilike.%${texto}%`)
+      .limit(20);
+    
     if (resCar.data) setAutosEncontrados(resCar.data);
     setBuscando(false);
   };
@@ -225,14 +228,12 @@ export default function HomeFeed() {
                 <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                   {usuariosEncontrados.map(user => (
                     <Link key={user.id_usuario} href={`/perfil/${user.nombre_usuario}`} className="flex flex-col items-center gap-2 min-w-[90px] group">
-                      {/* 👑 BORDE DORADO SI ES FUNDADOR */}
                       <div className={`w-16 h-16 rounded-full border-2 overflow-hidden bg-slate-800 transition-colors relative ${user.es_fundador ? 'border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)]' : (user.rol === 'VENDEDOR' ? 'border-amber-600' : 'border-slate-700 group-hover:border-cyan-500')}`}>
                         {user.link_img_perf ? <img src={user.link_img_perf} alt="Avatar" className="w-full h-full object-cover" /> : <svg className="w-full h-full text-slate-500 p-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
                         {user.rol !== 'USUARIO' && <div className="absolute bottom-0 w-full bg-amber-500 text-white text-[8px] font-black text-center py-0.5 leading-none">{user.rol === 'VENDEDOR' ? 'PRO' : 'ADMIN'}</div>}
                       </div>
                       <span className={`text-xs font-bold truncate w-full text-center transition-colors flex justify-center items-center gap-0.5 ${user.rol === 'VENDEDOR' ? 'text-amber-400' : 'text-white group-hover:text-cyan-400'}`}>
                         {user.nombre_usuario}
-                        {/* 👑 CORONITA */}
                         {user.es_fundador && <span className="text-amber-400 text-[10px]">👑</span>}
                       </span>
                     </Link>
@@ -245,30 +246,46 @@ export default function HomeFeed() {
               <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Piezas en Bóvedas</h2>
               {autosEncontrados.length === 0 && !buscando ? <p className="text-slate-600 text-sm">No se encontraron piezas con ese nombre o rareza.</p> : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {autosEncontrados.map(carro => (
-                    <article key={carro.id_carro} className="bg-[#0b1120] border border-slate-800 rounded-2xl p-3 shadow-lg hover:border-slate-700 transition-colors relative group">
-                      
-                      {carro.es_lote && <div className="absolute top-4 right-4 z-20 bg-purple-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">📦 LOTE</div>}
-                      {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">💲 VENTA</div>}
-                      {carro.es_preventa && <div className="absolute top-4 right-4 z-20 bg-indigo-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
-                      {carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
-                      {!carro.para_venta && carro.para_cambio && <div className="absolute top-4 left-4 z-20 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">CAMBIO</div>}
+                  {autosEncontrados.map(carro => {
+                    // ✨ EXTRACCIÓN INTELIGENTE DE DATOS CUSTOM (Para los resultados de búsqueda)
+                    const datosCustom = carro.carro_custom?.[0] || {};
+                    const nombreMarca = (carro.es_custom && datosCustom.marca) ? datosCustom.marca : (carro.marca?.marca || "Sin Marca");
+                    const nombrePres = (carro.es_custom && datosCustom.presentacion) ? datosCustom.presentacion : carro.presentacion?.presentacion;
+                    const nombreRareza = (carro.es_custom && datosCustom.rareza) ? datosCustom.rareza : (carro.rareza || "Común");
 
-                      <div className="flex items-center gap-2 mb-3">
-                        <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className={`w-6 h-6 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 border ${carro.usuario?.es_fundador ? 'border-amber-400' : 'border-slate-600'}`}>
-                          {carro.usuario?.link_img_perf ? <img src={carro.usuario.link_img_perf} alt="Avatar" className="w-full h-full object-cover" /> : <svg className="w-full h-full text-slate-500 p-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
+                    return (
+                      <article key={carro.id_carro} className="bg-[#0b1120] border border-slate-800 rounded-2xl p-3 shadow-lg hover:border-slate-700 transition-colors relative group">
+                        
+                        {carro.es_lote && !carro.es_custom && <div className="absolute top-4 right-4 z-20 bg-purple-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">📦 LOTE</div>}
+                        {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">💲 VENTA</div>}
+                        {carro.es_preventa && <div className="absolute top-4 right-4 z-20 bg-indigo-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
+                        {carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
+                        {!carro.para_venta && carro.para_cambio && !carro.es_custom && <div className="absolute top-4 left-4 z-20 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">CAMBIO</div>}
+
+                        <div className="flex items-center gap-2 mb-3">
+                          <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className={`w-6 h-6 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 border ${carro.usuario?.es_fundador ? 'border-amber-400' : 'border-slate-600'}`}>
+                            {carro.usuario?.link_img_perf ? <img src={carro.usuario.link_img_perf} alt="Avatar" className="w-full h-full object-cover" /> : <svg className="w-full h-full text-slate-500 p-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
+                          </Link>
+                          <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="text-[10px] font-bold text-slate-300 hover:text-white transition-colors truncate flex items-center gap-0.5">
+                            De {carro.usuario?.nombre_usuario || "Anónimo"}
+                            {carro.usuario?.es_fundador && <span className="text-amber-400">👑</span>}
+                          </Link>
+                        </div>
+                        <Link href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200">
+                          <CollectorCard 
+                            modelo={carro.modelo} 
+                            marca={nombreMarca} 
+                            rareza={nombreRareza} 
+                            presentacion={nombrePres} 
+                            valor={carro.valor} 
+                            valorCalculado={carro.valor_calculado} 
+                            imagenUrl={carro.imagen_url} 
+                            esCustom={carro.es_custom} // ✨ Enviamos la bandera para prender la etiqueta amarilla
+                          />
                         </Link>
-                        <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="text-[10px] font-bold text-slate-300 hover:text-white transition-colors truncate flex items-center gap-0.5">
-                          De {carro.usuario?.nombre_usuario || "Anónimo"}
-                          {/* 👑 CORONITA */}
-                          {carro.usuario?.es_fundador && <span className="text-amber-400">👑</span>}
-                        </Link>
-                      </div>
-                      <Link href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200">
-                        <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} presentacion={carro.presentacion?.presentacion} valor={carro.valor} valorCalculado={carro.valor_calculado} imagenUrl={carro.imagen_url} />
-                      </Link>
-                    </article>
-                  ))}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -291,45 +308,60 @@ export default function HomeFeed() {
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-6">
-                  {feedUnificado.map((carro, idx) => (
-                    <article 
-                      key={`${carro.id_carro}-${idx}`} 
-                      className={`bg-[#0b1120] border rounded-2xl p-3 transition-colors group relative shadow-lg ${carro.isGolden ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'border-slate-800 hover:border-slate-700'}`}
-                    >
-                      
-                      {carro.isGolden && (
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-600 to-yellow-500 text-slate-900 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-md z-30 whitespace-nowrap">
-                          🔥 Venta Local
-                        </div>
-                      )}
+                  {feedUnificado.map((carro, idx) => {
+                    // ✨ EXTRACCIÓN INTELIGENTE DE DATOS CUSTOM (Para el Feed Unificado)
+                    const datosCustom = carro.carro_custom?.[0] || {};
+                    const nombreMarca = (carro.es_custom && datosCustom.marca) ? datosCustom.marca : (carro.marca?.marca || "Sin Marca");
+                    const nombrePres = (carro.es_custom && datosCustom.presentacion) ? datosCustom.presentacion : carro.presentacion?.presentacion;
+                    const nombreRareza = (carro.es_custom && datosCustom.rareza) ? datosCustom.rareza : (carro.rareza || "Común");
 
-                      {/* 📦⏳🔨 ETIQUETAS PRO EN EL FEED */}
-                      {carro.es_lote && <div className="absolute top-4 left-4 z-20 bg-purple-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">📦 LOTE</div>}
-                      {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">💲 VENTA</div>}
-                      {carro.es_preventa && <div className="absolute top-4 right-4 z-20 bg-indigo-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
-                      {carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
-                      {!carro.para_venta && carro.para_cambio && <div className="absolute top-4 right-4 z-20 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">CAMBIO</div>}
+                    return (
+                      <article 
+                        key={`${carro.id_carro}-${idx}`} 
+                        className={`bg-[#0b1120] border rounded-2xl p-3 transition-colors group relative shadow-lg ${carro.isGolden ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'border-slate-800 hover:border-slate-700'}`}
+                      >
+                        
+                        {carro.isGolden && (
+                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-600 to-yellow-500 text-slate-900 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-md z-30 whitespace-nowrap">
+                            🔥 Venta Local
+                          </div>
+                        )}
 
-                      <div className="flex items-center gap-2 mb-3 mt-1">
-                        {/* 👑 BORDE DORADO SI ES FUNDADOR */}
-                        <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className={`w-6 h-6 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 border ${carro.usuario?.es_fundador ? 'border-amber-400' : (carro.usuario?.rol === 'VENDEDOR' ? 'border-amber-600' : 'border-slate-600')}`}>
-                          {carro.usuario?.link_img_perf ? <img src={carro.usuario.link_img_perf} alt="Avatar" className="w-full h-full object-cover" /> : <svg className="w-full h-full text-slate-500 p-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
-                        </Link>
-                        <div className="overflow-hidden">
-                          <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="text-[10px] font-bold text-slate-300 hover:text-white transition-colors truncate flex items-center gap-1">
-                            {carro.usuario?.nombre_usuario || "Anónimo"}
-                            {carro.usuario?.rol === 'VENDEDOR' && !carro.usuario?.es_fundador && <svg className="w-2.5 h-2.5 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>}
-                            {/* 👑 CORONITA */}
-                            {carro.usuario?.es_fundador && <span className="text-amber-400 text-[10px]">👑</span>}
+                        {/* 📦⏳🔨 ETIQUETAS PRO EN EL FEED */}
+                        {carro.es_lote && !carro.es_custom && <div className="absolute top-4 left-4 z-20 bg-purple-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">📦 LOTE</div>}
+                        {carro.para_venta && !carro.es_preventa && !carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">💲 VENTA</div>}
+                        {carro.es_preventa && <div className="absolute top-4 right-4 z-20 bg-indigo-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-pulse">⏳ PREVENTA</div>}
+                        {carro.es_subasta && <div className="absolute top-4 right-4 z-20 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md animate-bounce">🔨 SUBASTA</div>}
+                        {!carro.para_venta && carro.para_cambio && !carro.es_custom && <div className="absolute top-4 right-4 z-20 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-md">CAMBIO</div>}
+
+                        <div className="flex items-center gap-2 mb-3 mt-1">
+                          <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className={`w-6 h-6 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 border ${carro.usuario?.es_fundador ? 'border-amber-400' : (carro.usuario?.rol === 'VENDEDOR' ? 'border-amber-600' : 'border-slate-600')}`}>
+                            {carro.usuario?.link_img_perf ? <img src={carro.usuario.link_img_perf} alt="Avatar" className="w-full h-full object-cover" /> : <svg className="w-full h-full text-slate-500 p-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>}
                           </Link>
+                          <div className="overflow-hidden">
+                            <Link href={`/perfil/${carro.usuario?.nombre_usuario}`} className="text-[10px] font-bold text-slate-300 hover:text-white transition-colors truncate flex items-center gap-1">
+                              {carro.usuario?.nombre_usuario || "Anónimo"}
+                              {carro.usuario?.rol === 'VENDEDOR' && !carro.usuario?.es_fundador && <svg className="w-2.5 h-2.5 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>}
+                              {carro.usuario?.es_fundador && <span className="text-amber-400 text-[10px]">👑</span>}
+                            </Link>
+                          </div>
                         </div>
-                      </div>
 
-                      <Link href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200 relative">
-                        <CollectorCard modelo={carro.modelo} marca={carro.marca?.marca || "Sin Marca"} rareza={carro.rareza || "Común"} presentacion={carro.presentacion?.presentacion} valor={carro.valor} valorCalculado={carro.valor_calculado} imagenUrl={carro.imagen_url} />
-                      </Link>
-                    </article>
-                  ))}
+                        <Link href={`/pieza/${carro.id_carro}`} className="block transition-transform hover:scale-[1.02] active:scale-95 duration-200 relative">
+                          <CollectorCard 
+                            modelo={carro.modelo} 
+                            marca={nombreMarca} 
+                            rareza={nombreRareza} 
+                            presentacion={nombrePres} 
+                            valor={carro.valor} 
+                            valorCalculado={carro.valor_calculado} 
+                            imagenUrl={carro.imagen_url} 
+                            esCustom={carro.es_custom} // ✨ Enviamos la bandera
+                          />
+                        </Link>
+                      </article>
+                    );
+                  })}
                 </div>
               </section>
             )}

@@ -5,7 +5,7 @@ import { Metadata } from 'next';
 import BotonReportar from '@/components/BotonReportar';
 import BotonCompartir from '@/components/BotonCompartir'; 
 import GaleriaImagenes from '@/components/GaleriaImagenes'; 
-import SubastaEnVivo from '@/components/SubastaEnVivo'; // 🔨 1. IMPORTAMOS EL WIDGET DE SUBASTAS
+import SubastaEnVivo from '@/components/SubastaEnVivo'; 
 
 export const revalidate = 60; 
 
@@ -16,10 +16,17 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const resolvedParams = await params;
   const idCarro = resolvedParams.id;
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get() { return ''; } } });
-  const { data: carro } = await supabase.from('carro').select('modelo, marca(marca), valor, imagen_url, usuario:id_usuario(nombre_usuario)').eq('id_carro', idCarro).single();
+  
+  // ✨ ACTUALIZACIÓN: Traer datos custom para el SEO
+  const { data: carro } = await supabase.from('carro').select('modelo, marca(marca), es_custom, carro_custom(marca), valor, imagen_url, usuario:id_usuario(nombre_usuario)').eq('id_carro', idCarro).single();
+  
   if (!carro) return { title: 'Pieza no encontrada - Collectors' };
   const carroData = carro as any;
-  const titulo = `${carroData.modelo} (${carroData.marca?.marca || 'Custom'}) | Collectors`;
+  
+  const datosCustom = carroData.carro_custom?.[0] || {};
+  const nombreMarcaSeo = (carroData.es_custom && datosCustom.marca) ? datosCustom.marca : (carroData.marca?.marca || 'Desconocida');
+
+  const titulo = `${carroData.modelo} (${nombreMarcaSeo}) ${carroData.es_custom ? '| 🎨 Custom' : ''} | Collectors`;
   const descripcion = `Mira esta increíble pieza en la bóveda de @${carroData.usuario?.nombre_usuario || 'un coleccionista'}. Valuada en $${carroData.valor}. ¡Entra a Collectors para ver los detalles!`;
   const urlImagen = carroData.imagen_url || 'https://collectors-app-ecru.vercel.app/favicon.ico'; 
 
@@ -43,6 +50,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
     { cookies: { get(name: string) { return cookieStore.get(name)?.value; } } }
   );
 
+  // ✨ ACTUALIZACIÓN: Agregamos `carro_custom(*)` al query
   const { data: carro } = await supabase
     .from('carro')
     .select(`
@@ -53,7 +61,8 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
       presentacion(presentacion),
       escala_rel:escala(escala),
       estado_carro_rel:estado_carro(estado_carro),
-      usuario:id_usuario(id_usuario, nombre_usuario, link_img_perf, whatsapp, facebook, correo, rol)
+      usuario:id_usuario(id_usuario, nombre_usuario, link_img_perf, whatsapp, facebook, correo, rol, es_fundador),
+      carro_custom(*) 
     `)
     .eq('id_carro', idCarro)
     .single();
@@ -82,7 +91,6 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
     }
   }
 
-  // 🔨 2. TRAER DATOS DE LA SUBASTA (Si aplica)
   let subastaData = null;
   if (carro.es_subasta) {
     const { data: sub } = await supabase.from('subasta').select('*').eq('id_carro', idCarro).single();
@@ -120,6 +128,16 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
   const urlCompartir = `https://collectors-app-ecru.vercel.app/pieza/${idCarro}`;
   const textoCompartir = `¡Mira este ${carro.modelo} valuado en $${carro.valor} en Collectors!`;
 
+  // ✨ LÓGICA INTELIGENTE: Extraer Nombres Custom
+  const datosCustom = carro.carro_custom?.[0] || {};
+  const nombreMarca = (carro.es_custom && datosCustom.marca) ? datosCustom.marca : (carro.marca?.marca || "Desconocida");
+  const nombreFabricante = (carro.es_custom && datosCustom.fabricante) ? datosCustom.fabricante : (carro.fabricante?.fabricante || "Sin Fabricante");
+  const nombreSerie = (carro.es_custom && datosCustom.serie) ? datosCustom.serie : (carro.serie?.serie || "Sin Serie");
+  const anioSerie = (carro.es_custom && datosCustom.anio) ? datosCustom.anio : carro.serie?.anio;
+  const nombreRareza = (carro.es_custom && datosCustom.rareza) ? datosCustom.rareza : (carro.rareza || "Estándar");
+  const nombrePresentacion = (carro.es_custom && datosCustom.presentacion) ? datosCustom.presentacion : (carro.presentacion?.presentacion || "Individual Básico");
+
+
   return (
     <main className="min-h-screen bg-slate-50 selection:bg-cyan-200 selection:text-cyan-900 pb-20 font-sans">
       
@@ -137,18 +155,27 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
         <div className="lg:col-span-7 flex flex-col gap-4">
           <GaleriaImagenes imagenPrincipal={carro.imagen_url} galeria={carro.galeria} modelo={carro.modelo}>
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-2 items-start">
+              
+              {/* ✨ ETIQUETA SUPERIOR CUSTOM */}
+              {carro.es_custom && (
+                <div className="bg-amber-400 border border-amber-300 text-slate-900 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg flex items-center gap-1.5">
+                  <span>🎨</span> CUSTOM
+                </div>
+              )}
+
               <div className="bg-white/90 backdrop-blur-md border border-slate-200 text-slate-800 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-md">
-                {carro.rareza || 'ESTÁNDAR'}
+                {nombreRareza}
               </div>
-              {carro.presentacion?.presentacion && carro.presentacion.presentacion !== 'Individual Básico' && (
+
+              {nombrePresentacion && nombrePresentacion !== 'Individual Básico' && (
                 <div className="bg-indigo-900/80 backdrop-blur-md border border-indigo-500/50 text-indigo-100 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-1">
-                  📦 {carro.presentacion.presentacion}
+                  📦 {nombrePresentacion}
                 </div>
               )}
             </div>
             
             <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 items-end">
-              {carro.es_lote && (
+              {carro.es_lote && !carro.es_custom && (
                 <div className="bg-purple-600/90 backdrop-blur-md border border-purple-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1">📦 LOTE</div>
               )}
               {esVenta && !carro.es_preventa && !carro.es_subasta && (
@@ -160,7 +187,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               {carro.es_subasta && (
                 <div className="bg-rose-600/90 backdrop-blur-md border border-rose-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md shadow-rose-500/50 animate-bounce flex items-center gap-1">🔨 SUBASTA</div>
               )}
-              {esCambio && !esVenta && (
+              {esCambio && !esVenta && !carro.es_custom && (
                 <div className="bg-emerald-500/90 backdrop-blur-md border border-emerald-400 text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg> CAMBIO</div>
               )}
             </div>
@@ -179,7 +206,8 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
               </p>
               <p className="text-sm font-black text-slate-800 group-hover:text-cyan-600 transition-colors leading-none flex items-center gap-1">
                 {carro.usuario?.nombre_usuario || 'Anónimo'}
-                {carro.usuario?.rol === 'VENDEDOR' && <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>}
+                {carro.usuario?.rol === 'VENDEDOR' && !carro.usuario?.es_fundador && <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>}
+                {carro.usuario?.es_fundador && <span className="text-amber-400 text-sm drop-shadow-sm ml-0.5">👑</span>}
               </p>
             </div>
           </Link>
@@ -193,16 +221,21 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
           <h1 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight mb-2 tracking-tight">
             {carro.modelo}
           </h1>
-          <p className="text-xl text-cyan-600 font-bold mb-8">{carro.marca?.marca || 'Marca Desconocida'} • {carro.fabricante?.fabricante || 'Sin Fabricante'}</p>
+          <p className="text-xl text-cyan-600 font-bold mb-8">
+            {nombreMarca} • {nombreFabricante}
+          </p>
 
           <div className="grid grid-cols-2 gap-4 mb-8">
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
               <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Serie / Año</p>
-              <p className="text-sm text-slate-800 font-bold">{carro.serie?.serie || 'Sin Serie'} {carro.serie?.anio ? `(${carro.serie.anio})` : ''}</p>
+              <p className="text-sm text-slate-800 font-bold">{nombreSerie} {anioSerie ? `(${anioSerie})` : ''}</p>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
               <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Número</p>
-              <p className="text-sm text-slate-800 font-bold">{carro.no_carro ? `${carro.no_carro} ` : '- '} {carro.serie?.no_carros ? `/ ${carro.serie.no_carros}` : ''}</p>
+              <p className="text-sm text-slate-800 font-bold">
+                {carro.es_custom ? '-' : (carro.no_carro ? `${carro.no_carro} ` : '- ')} 
+                {(!carro.es_custom && carro.serie?.no_carros) ? `/ ${carro.serie.no_carros}` : ''}
+              </p>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
               <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Escala</p>
@@ -216,7 +249,7 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
             <div className="col-span-2 bg-indigo-50 border border-indigo-100 rounded-2xl p-4 shadow-sm flex items-center justify-between">
               <div>
                 <p className="text-xs text-indigo-500 uppercase font-bold tracking-wider mb-1">Empaque Original</p>
-                <p className="text-sm text-indigo-900 font-black">{carro.presentacion?.presentacion || 'Individual Básico'}</p>
+                <p className="text-sm text-indigo-900 font-black">{nombrePresentacion}</p>
               </div>
               <div className="text-3xl">📦</div>
             </div>
@@ -232,32 +265,32 @@ export default async function DetallePieza({ params }: { params: Promise<{ id: s
             </div>
           )}
 
-          {/* Ocultamos esto si es subasta, porque la subasta tiene su propio panel de precio */}
           {!carro.es_subasta && (
             <div className="grid grid-cols-2 gap-4 mb-10">
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left">
                 <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Precio del Dueño</p>
                 <p className="text-3xl font-black text-slate-900">${carro.valor ? carro.valor.toLocaleString() : '0'}</p>
               </div>
-              <div className="bg-cyan-50 border border-cyan-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-400/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                <p className="text-[10px] text-cyan-700 uppercase font-black tracking-widest mb-1 relative z-10 flex items-center gap-1.5">
-                  Valuación IA 
-                  <span className="text-[8px] bg-cyan-600 text-white px-1.5 py-0.5 rounded shadow-sm">BETA</span>
+
+              {/* ✨ ACTUALIZACIÓN: Panel IA o Panel Costo Base (Si es Custom) */}
+              <div className={`${carro.es_custom ? 'bg-amber-50 border-amber-200' : 'bg-cyan-50 border-cyan-200'} border rounded-2xl p-5 shadow-sm flex flex-col justify-center text-left relative overflow-hidden`}>
+                <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 ${carro.es_custom ? 'bg-amber-400/20' : 'bg-cyan-400/20'}`}></div>
+                <p className={`text-[10px] uppercase font-black tracking-widest mb-1 relative z-10 flex items-center gap-1.5 ${carro.es_custom ? 'text-amber-700' : 'text-cyan-700'}`}>
+                  {carro.es_custom ? 'Costo Base Custom' : 'Valuación IA'}
+                  {!carro.es_custom && <span className="text-[8px] bg-cyan-600 text-white px-1.5 py-0.5 rounded shadow-sm">BETA</span>}
                 </p>
-                {carro.es_lote ? (
+                {carro.es_lote && !carro.es_custom ? (
                   <>
-                    <p className="text-2xl font-black text-cyan-800 relative z-10 opacity-50">N/A</p>
-                    <p className="text-[9px] text-cyan-600 font-bold mt-1 relative z-10">La IA no valúa lotes.</p>
+                    <p className={`text-2xl font-black relative z-10 opacity-50 ${carro.es_custom ? 'text-amber-800' : 'text-cyan-800'}`}>N/A</p>
+                    <p className={`text-[9px] font-bold mt-1 relative z-10 ${carro.es_custom ? 'text-amber-600' : 'text-cyan-600'}`}>La IA no valúa lotes.</p>
                   </>
                 ) : (
-                  <p className="text-3xl font-black text-cyan-800 relative z-10">${carro.valor_calculado ? carro.valor_calculado.toLocaleString() : '0'}</p>
+                  <p className={`text-3xl font-black relative z-10 ${carro.es_custom ? 'text-amber-800' : 'text-cyan-800'}`}>${carro.valor_calculado ? carro.valor_calculado.toLocaleString() : '0'}</p>
                 )}
               </div>
             </div>
           )}
 
-          {/* 🔨 3. MOTOR INTELIGENTE DE NEGOCIACIÓN O SUBASTA */}
           {carro.es_subasta && subastaData ? (
             <div className="mb-10">
               <SubastaEnVivo 

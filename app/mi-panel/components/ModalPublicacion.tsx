@@ -152,12 +152,15 @@ export default function ModalPublicacion({
       finalIdMar = nuevoCarro.id_marca !== "nuevo" ? parseInt(nuevoCarro.id_marca) : null;
       finalIdSer = nuevoCarro.id_serie !== "nuevo" ? parseInt(nuevoCarro.id_serie) : null;
       finalIdPres = nuevoCarro.id_presentacion !== "nuevo" ? parseInt(nuevoCarro.id_presentacion) : null;
+      // ✨ LÍNEA CORREGIDA PARA SOLUCIONAR EL ERROR "2"
+      finalIdRareza = nuevoCarro.rareza !== "nuevo" ? parseInt(nuevoCarro.rareza) : null;
     }
 
     const finalAnio = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
     const nombreEst = estadosCarro.find((e: any) => e.id_estado_carro.toString() === nuevoCarro.id_estado_carro)?.estado_carro || "";
     const nombreFab = fabricantes.find((f: any) => f.id_fabricante.toString() === nuevoCarro.id_fabricante)?.fabricante || nuevoCarro.otro_fabricante;
     
+    // Aquí el sistema traduce el ID de la rareza por su nombre real
     const { data: rarData } = finalIdRareza ? await supabase.from('rareza').select('rareza').eq('id_rareza', finalIdRareza).single() : { data: null };
     const nombreRarezaFinal = nuevoCarro.es_custom && nuevoCarro.rareza === 'nuevo' ? nuevoCarro.rareza_custom_texto : (rarData?.rareza || nuevoCarro.rareza);
 
