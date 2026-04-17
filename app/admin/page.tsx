@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link"; 
+// ✨ IMPORTAMOS EL NUEVO CENTRO DE MANDO
+import TabMotorIA from "../mi-panel/components/TabMotorIA"; 
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -152,7 +154,6 @@ export default function AdminDashboard() {
     if (error) alert("Error: " + error.message); else cargarTodosLosDatos(miRol);
   };
 
-  // 👑 NUEVA FUNCIÓN: OTORGAR O QUITAR EL ESTATUS DE FUNDADOR
   const cambiarEstatusFundador = async (id_usuario: number, estadoActual: boolean) => {
     const { error } = await supabase.from('usuario').update({ es_fundador: !estadoActual }).eq('id_usuario', id_usuario);
     if (error) alert("Error: " + error.message); else cargarTodosLosDatos(miRol);
@@ -190,7 +191,7 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-bold text-white tracking-wide">
             Panel <span className={miRol === 'SUPER_ADMIN' ? "text-purple-500" : "text-cyan-500"}>{miRol === 'SUPER_ADMIN' ? 'SÚPER ADMIN' : 'COLABORADOR'}</span>
           </h1>
-          <p className="text-slate-400 mt-1">{miRol === 'SUPER_ADMIN' ? 'Gestión total del sistema.' : 'Gestión de catálogos base.'}</p>
+          <p className="text-slate-400 mt-1">{miRol === 'SUPER_ADMIN' ? 'Gestión total del sistema y motor IA.' : 'Gestión de catálogos base.'}</p>
         </div>
       </header>
 
@@ -213,7 +214,12 @@ export default function AdminDashboard() {
 
           {miRol === 'SUPER_ADMIN' && (
             <>
-              <button onClick={() => setTabActiva("usuarios")} className={`whitespace-nowrap lg:mt-2 text-left px-4 py-3 rounded-lg font-medium transition-colors flex justify-between items-center ${tabActiva === "usuarios" ? "bg-emerald-900/40 border border-emerald-900 text-emerald-400" : "text-slate-400 hover:bg-slate-800/30"}`}>
+              {/* ✨ NUEVO BOTÓN: MOTOR IA */}
+              <button onClick={() => setTabActiva("motoria")} className={`whitespace-nowrap mt-2 text-left px-4 py-3 rounded-lg font-bold transition-colors flex items-center justify-between shadow-md ${tabActiva === "motoria" ? "bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-amber-500/30" : "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border border-amber-500/20"}`}>
+                <span className="flex items-center gap-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Motor IA Pro</span>
+              </button>
+
+              <button onClick={() => setTabActiva("usuarios")} className={`whitespace-nowrap mt-2 text-left px-4 py-3 rounded-lg font-medium transition-colors flex justify-between items-center ${tabActiva === "usuarios" ? "bg-emerald-900/40 border border-emerald-900 text-emerald-400" : "text-slate-400 hover:bg-slate-800/30"}`}>
                 <span>Usuarios</span>
                 <span className="bg-slate-800 text-xs px-2 py-1 rounded-full ml-2">{usuarios.length}</span>
               </button>
@@ -240,145 +246,151 @@ export default function AdminDashboard() {
 
         <main className="lg:col-span-4 bg-[#0b1120] border border-slate-800 rounded-2xl p-4 md:p-6 shadow-xl min-h-[500px] overflow-hidden">
           
-          <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
-            <input type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full md:w-1/2 bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-2 focus:border-cyan-500 outline-none" />
-            
-            {(tabActiva !== "usuarios" && tabActiva !== "coches" && tabActiva !== "buzon" && tabActiva !== "boletines" && tabActiva !== "reportes") && (
-              <button onClick={() => abrirModalCrear(tabActiva === 'estados' ? 'estado' : tabActiva === 'presentaciones' ? 'presentacion' : tabActiva.slice(0, -1))} className="w-full md:w-auto bg-cyan-700 hover:bg-cyan-600 text-white px-4 py-2 rounded-md font-bold">
-                + Nuevo Registro
-              </button>
-            )}
-          </div>
-
-          <div className="overflow-x-auto pb-4">
-            <table className="w-full text-left border-collapse min-w-[600px]">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-500 text-sm uppercase tracking-wider">
-                  <th className="pb-3 pl-2 font-medium">ID</th>
-                  {tabActiva === "marcas" && <th className="pb-3 font-medium">Nombre de la Marca</th>}
-                  {tabActiva === "fabricantes" && <th className="pb-3 font-medium">Nombre del Fabricante</th>}
-                  {tabActiva === "escalas" && <th className="pb-3 font-medium">Escala</th>}
-                  {tabActiva === "estados" && <th className="pb-3 font-medium">Estado del Auto</th>}
-                  {tabActiva === "series" && <><th className="pb-3 font-medium">Serie</th><th className="pb-3 font-medium">Fabricante</th><th className="pb-3 text-center font-medium">Año</th><th className="pb-3 text-center font-medium">Autos</th></>}
-                  {tabActiva === "rarezas" && <><th className="pb-3 font-medium">Nivel de Rareza</th><th className="pb-3 font-medium">Fabricante</th></>}
-                  {tabActiva === "presentaciones" && <><th className="pb-3 font-medium">Presentación / Empaque</th><th className="pb-3 font-medium">Fabricante</th></>}
-                  {/* 👑 AÑADIMOS LA COLUMNA PRIVILEGIOS */}
-                  {tabActiva === "usuarios" && <><th className="pb-3 font-medium">Usuario / Correo</th><th className="pb-3 font-medium">Rol</th><th className="pb-3 font-medium text-center">Privilegios</th></>}
-                  {tabActiva === "coches" && <><th className="pb-3 font-medium">Auto</th><th className="pb-3 font-medium">Estatus</th><th className="pb-3 font-medium text-center">Valor</th></>}
-                  {tabActiva === "buzon" && <><th className="pb-3 font-medium">Tipo</th><th className="pb-3 font-medium">Usuario</th><th className="pb-3 font-medium">Mensaje</th><th className="pb-3 font-medium text-center">Estado</th></>}
-                  {tabActiva === "boletines" && <><th className="pb-3 font-medium">Comprador Reportado</th><th className="pb-3 font-medium">Tienda (Denunciante)</th><th className="pb-3 font-medium">Motivo / Palabras Clave</th></>}
-                  {tabActiva === "reportes" && <><th className="pb-3 font-medium">Motivo</th><th className="pb-3 font-medium">Auto Reportado</th><th className="pb-3 font-medium">Comentarios</th><th className="pb-3 font-medium text-center">Estado</th></>}
-                  <th className="pb-3 text-right pr-2 font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="text-slate-300">
+          {/* ✨ RENDERIZAMOS EL MOTOR IA SI ESTÁ ACTIVO (SIN BUSCADOR ARRIBA) */}
+          {tabActiva === "motoria" ? (
+            <TabMotorIA />
+          ) : (
+            <>
+              <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                <input type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full md:w-1/2 bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-2 focus:border-cyan-500 outline-none" />
                 
-                {tabActiva === "marcas" && marcasFiltradas.map((m) => ( <tr key={m.id_marca} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{m.id_marca}</td><td className="py-3 font-semibold">{m.marca}</td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('marca', m)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('marca', 'id_marca', m.id_marca)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ))}
-                {tabActiva === "fabricantes" && fabricantesFiltrados.map((f) => ( <tr key={f.id_fabricante} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{f.id_fabricante}</td><td className="py-3 font-semibold">{f.fabricante}</td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('fabricante', f)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('fabricante', 'id_fabricante', f.id_fabricante)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ))}
-                {tabActiva === "escalas" && escalasFiltradas.map((e) => ( <tr key={e.id_escala} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{e.id_escala}</td><td className="py-3 font-semibold">{e.escala}</td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('escala', e)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('escala', 'id_escala', e.id_escala)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ))}
-                {tabActiva === "estados" && estadosFiltrados.map((e) => ( <tr key={e.id_estado_carro} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{e.id_estado_carro}</td><td className="py-3 font-semibold">{e.estado_carro}</td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('estado', e)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('estado_carro', 'id_estado_carro', e.id_estado_carro)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ))}
-                {tabActiva === "series" && seriesFiltradas.map((s) => { const nombreFabricante = fabricantes.find(f => f.id_fabricante === s.id_fabricante)?.fabricante || "Desconocido"; return ( <tr key={s.id_serie} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{s.id_serie}</td><td className="py-3 font-semibold text-cyan-400">{s.serie}</td><td className="py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{nombreFabricante}</span></td><td className="py-3 text-center">{s.anio || "-"}</td><td className="py-3 text-center font-bold">{s.no_carros || "-"}</td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('serie', s)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('serie', 'id_serie', s.id_serie)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ); })}
-                {tabActiva === "rarezas" && rarezasFiltradas.map((r) => { const nombreFabricante = fabricantes.find(f => f.id_fabricante === r.id_fabricante)?.fabricante || "Desconocido"; return ( <tr key={r.id_rareza} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{r.id_rareza}</td><td className="py-3 font-semibold text-purple-400">{r.rareza}</td><td className="py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{nombreFabricante}</span></td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('rareza', r)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('rareza', 'id_rareza', r.id_rareza)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ); })}
-                {tabActiva === "presentaciones" && presentacionesFiltradas.map((p) => { const nombreFabricante = fabricantes.find(f => f.id_fabricante === p.id_fabricante)?.fabricante || "Desconocido"; return ( <tr key={p.id_presentacion} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{p.id_presentacion}</td><td className="py-3 font-semibold text-amber-400">{p.presentacion}</td><td className="py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{nombreFabricante}</span></td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('presentacion', p)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('presentacion', 'id_presentacion', p.id_presentacion)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ); })}
+                {(tabActiva !== "usuarios" && tabActiva !== "coches" && tabActiva !== "buzon" && tabActiva !== "boletines" && tabActiva !== "reportes") && (
+                  <button onClick={() => abrirModalCrear(tabActiva === 'estados' ? 'estado' : tabActiva === 'presentaciones' ? 'presentacion' : tabActiva.slice(0, -1))} className="w-full md:w-auto bg-cyan-700 hover:bg-cyan-600 text-white px-4 py-2 rounded-md font-bold">
+                    + Nuevo Registro
+                  </button>
+                )}
+              </div>
 
-                {miRol === 'SUPER_ADMIN' && tabActiva === "usuarios" && usuariosFiltrados.map((u) => (
-                  <tr key={u.id_usuario} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                    <td className="py-3 pl-2 text-slate-500">#{u.id_usuario}</td><td className="py-3"><div className="font-semibold text-slate-200">{u.nombre_usuario || "Sin Nombre"}</div><div className="text-xs text-slate-500">{u.correo}</div></td>
-                    <td className="py-3">
-                      <select value={u.rol || "USUARIO"} onChange={(e) => cambiarRolUsuario(u.id_usuario, e.target.value)} className="bg-slate-800 text-slate-300 border-slate-700 px-2 py-1 rounded outline-none text-xs font-bold">
-                        <option value="USUARIO">Usuario (Base)</option><option value="VENDEDOR">Vendedor</option><option value="COLABORADOR">Colaborador</option><option value="SUPER_ADMIN">Súper Admin</option>
-                      </select>
-                    </td>
-                    {/* 👑 COLUMNA DE BOTÓN FUNDADOR */}
-                    <td className="py-3 text-center">
-                      <button 
-                        onClick={() => cambiarEstatusFundador(u.id_usuario, !!u.es_fundador)}
-                        className={`text-[10px] font-black px-3 py-1.5 rounded-full uppercase transition-all ${u.es_fundador ? 'bg-gradient-to-r from-amber-600 to-yellow-500 text-white shadow-[0_0_10px_rgba(245,158,11,0.5)] border border-amber-400' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700'}`}
-                      >
-                        {u.es_fundador ? '👑 Fundador' : 'Hacer Fundador'}
-                      </button>
-                    </td>
-                    <td className="py-3 text-right pr-2"><button onClick={() => eliminarRegistro('usuario', 'id_usuario', u.id_usuario)} className="text-red-500 font-bold p-2 hover:bg-red-900/30 rounded">Banear</button></td>
-                  </tr>
-                ))}
+              <div className="overflow-x-auto pb-4">
+                <table className="w-full text-left border-collapse min-w-[600px]">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-500 text-sm uppercase tracking-wider">
+                      <th className="pb-3 pl-2 font-medium">ID</th>
+                      {tabActiva === "marcas" && <th className="pb-3 font-medium">Nombre de la Marca</th>}
+                      {tabActiva === "fabricantes" && <th className="pb-3 font-medium">Nombre del Fabricante</th>}
+                      {tabActiva === "escalas" && <th className="pb-3 font-medium">Escala</th>}
+                      {tabActiva === "estados" && <th className="pb-3 font-medium">Estado del Auto</th>}
+                      {tabActiva === "series" && <><th className="pb-3 font-medium">Serie</th><th className="pb-3 font-medium">Fabricante</th><th className="pb-3 text-center font-medium">Año</th><th className="pb-3 text-center font-medium">Autos</th></>}
+                      {tabActiva === "rarezas" && <><th className="pb-3 font-medium">Nivel de Rareza</th><th className="pb-3 font-medium">Fabricante</th></>}
+                      {tabActiva === "presentaciones" && <><th className="pb-3 font-medium">Presentación / Empaque</th><th className="pb-3 font-medium">Fabricante</th></>}
+                      {tabActiva === "usuarios" && <><th className="pb-3 font-medium">Usuario / Correo</th><th className="pb-3 font-medium">Rol</th><th className="pb-3 font-medium text-center">Privilegios</th></>}
+                      {tabActiva === "coches" && <><th className="pb-3 font-medium">Auto</th><th className="pb-3 font-medium">Estatus</th><th className="pb-3 font-medium text-center">Valor</th></>}
+                      {tabActiva === "buzon" && <><th className="pb-3 font-medium">Tipo</th><th className="pb-3 font-medium">Usuario</th><th className="pb-3 font-medium">Mensaje</th><th className="pb-3 font-medium text-center">Estado</th></>}
+                      {tabActiva === "boletines" && <><th className="pb-3 font-medium">Comprador Reportado</th><th className="pb-3 font-medium">Tienda (Denunciante)</th><th className="pb-3 font-medium">Motivo / Palabras Clave</th></>}
+                      {tabActiva === "reportes" && <><th className="pb-3 font-medium">Motivo</th><th className="pb-3 font-medium">Auto Reportado</th><th className="pb-3 font-medium">Comentarios</th><th className="pb-3 font-medium text-center">Estado</th></>}
+                      <th className="pb-3 text-right pr-2 font-medium">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-slate-300">
+                    
+                    {tabActiva === "marcas" && marcasFiltradas.map((m) => ( <tr key={m.id_marca} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{m.id_marca}</td><td className="py-3 font-semibold">{m.marca}</td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('marca', m)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('marca', 'id_marca', m.id_marca)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ))}
+                    {tabActiva === "fabricantes" && fabricantesFiltrados.map((f) => ( <tr key={f.id_fabricante} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{f.id_fabricante}</td><td className="py-3 font-semibold">{f.fabricante}</td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('fabricante', f)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('fabricante', 'id_fabricante', f.id_fabricante)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ))}
+                    {tabActiva === "escalas" && escalasFiltradas.map((e) => ( <tr key={e.id_escala} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{e.id_escala}</td><td className="py-3 font-semibold">{e.escala}</td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('escala', e)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('escala', 'id_escala', e.id_escala)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ))}
+                    {tabActiva === "estados" && estadosFiltrados.map((e) => ( <tr key={e.id_estado_carro} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{e.id_estado_carro}</td><td className="py-3 font-semibold">{e.estado_carro}</td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('estado', e)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('estado_carro', 'id_estado_carro', e.id_estado_carro)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ))}
+                    {tabActiva === "series" && seriesFiltradas.map((s) => { const nombreFabricante = fabricantes.find(f => f.id_fabricante === s.id_fabricante)?.fabricante || "Desconocido"; return ( <tr key={s.id_serie} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{s.id_serie}</td><td className="py-3 font-semibold text-cyan-400">{s.serie}</td><td className="py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{nombreFabricante}</span></td><td className="py-3 text-center">{s.anio || "-"}</td><td className="py-3 text-center font-bold">{s.no_carros || "-"}</td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('serie', s)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('serie', 'id_serie', s.id_serie)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ); })}
+                    {tabActiva === "rarezas" && rarezasFiltradas.map((r) => { const nombreFabricante = fabricantes.find(f => f.id_fabricante === r.id_fabricante)?.fabricante || "Desconocido"; return ( <tr key={r.id_rareza} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{r.id_rareza}</td><td className="py-3 font-semibold text-purple-400">{r.rareza}</td><td className="py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{nombreFabricante}</span></td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('rareza', r)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('rareza', 'id_rareza', r.id_rareza)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ); })}
+                    {tabActiva === "presentaciones" && presentacionesFiltradas.map((p) => { const nombreFabricante = fabricantes.find(f => f.id_fabricante === p.id_fabricante)?.fabricante || "Desconocido"; return ( <tr key={p.id_presentacion} className="border-b border-slate-800/50 hover:bg-slate-800/30"><td className="py-3 pl-2 text-slate-500">#{p.id_presentacion}</td><td className="py-3 font-semibold text-amber-400">{p.presentacion}</td><td className="py-3"><span className="bg-slate-800 px-2 py-1 rounded text-xs">{nombreFabricante}</span></td><td className="py-3 text-right pr-2 space-x-3"><button onClick={() => abrirModalEditar('presentacion', p)} className="text-cyan-500 font-bold p-2">Editar</button>{miRol === 'SUPER_ADMIN' && <button onClick={() => eliminarRegistro('presentacion', 'id_presentacion', p.id_presentacion)} className="text-red-500 font-bold p-2">Eliminar</button>}</td></tr> ); })}
 
-                {tabActiva === "coches" && cochesFiltrados.map((carro) => (
-                  <tr key={carro.id_carro} className={`border-b border-slate-800/50 hover:bg-slate-800/30 ${carro.estado_aprobacion === 'PENDIENTE' ? 'bg-amber-900/10' : ''}`}>
-                    <td className="py-4 pl-2 text-slate-500">#{carro.id_carro}</td>
-                    <td className="py-4"><div className="font-bold text-white">{carro.modelo}</div><div className="text-xs text-slate-400 mt-1">{carro.marca?.marca || "Sin Marca"}</div></td>
-                    <td className="py-4">
-                      {carro.estado_aprobacion === 'PENDIENTE' ? <span className="bg-amber-500/20 text-amber-500 border border-amber-500/50 px-2 py-1 rounded text-[10px] font-bold uppercase animate-pulse">Pendiente</span> : <span className="bg-emerald-500/20 text-emerald-500 border border-emerald-500/50 px-2 py-1 rounded text-[10px] font-bold uppercase">Aprobado</span>}
-                    </td>
-                    <td className="py-4 text-center text-emerald-400 font-mono">${carro.valor}</td>
-                    <td className="py-4 text-right pr-2 space-x-2">
-                      <Link href={`/pieza/${carro.id_carro}`} target="_blank" className="text-cyan-400 font-bold p-2 hover:bg-cyan-900/30 rounded">Ver</Link>
-                      {carro.estado_aprobacion === 'PENDIENTE' && <button onClick={() => aprobarAuto(carro.id_carro)} className="text-emerald-400 font-bold p-2 hover:bg-emerald-900/30 rounded">Aprobar</button>}
-                      <button onClick={() => rechazarAuto(carro.id_carro)} className="text-red-400 font-bold p-2 hover:bg-red-900/30 rounded">{carro.estado_aprobacion === 'PENDIENTE' ? 'Rechazar' : 'Eliminar'}</button>
-                    </td>
-                  </tr>
-                ))}
+                    {miRol === 'SUPER_ADMIN' && tabActiva === "usuarios" && usuariosFiltrados.map((u) => (
+                      <tr key={u.id_usuario} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                        <td className="py-3 pl-2 text-slate-500">#{u.id_usuario}</td><td className="py-3"><div className="font-semibold text-slate-200">{u.nombre_usuario || "Sin Nombre"}</div><div className="text-xs text-slate-500">{u.correo}</div></td>
+                        <td className="py-3">
+                          <select value={u.rol || "USUARIO"} onChange={(e) => cambiarRolUsuario(u.id_usuario, e.target.value)} className="bg-slate-800 text-slate-300 border-slate-700 px-2 py-1 rounded outline-none text-xs font-bold">
+                            <option value="USUARIO">Usuario (Base)</option><option value="VENDEDOR">Vendedor</option><option value="COLABORADOR">Colaborador</option><option value="SUPER_ADMIN">Súper Admin</option>
+                          </select>
+                        </td>
+                        <td className="py-3 text-center">
+                          <button 
+                            onClick={() => cambiarEstatusFundador(u.id_usuario, !!u.es_fundador)}
+                            className={`text-[10px] font-black px-3 py-1.5 rounded-full uppercase transition-all ${u.es_fundador ? 'bg-gradient-to-r from-amber-600 to-yellow-500 text-white shadow-[0_0_10px_rgba(245,158,11,0.5)] border border-amber-400' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700'}`}
+                          >
+                            {u.es_fundador ? '👑 Fundador' : 'Hacer Fundador'}
+                          </button>
+                        </td>
+                        <td className="py-3 text-right pr-2"><button onClick={() => eliminarRegistro('usuario', 'id_usuario', u.id_usuario)} className="text-red-500 font-bold p-2 hover:bg-red-900/30 rounded">Banear</button></td>
+                      </tr>
+                    ))}
 
-                {miRol === 'SUPER_ADMIN' && tabActiva === "buzon" && feedbacksFiltrados.map((f) => (
-                  <tr key={f.id_feedback} className={`border-b border-slate-800/50 hover:bg-slate-800/30 ${f.estado === 'PENDIENTE' ? 'bg-indigo-900/10' : 'opacity-60'}`}>
-                    <td className="py-4 pl-2 text-slate-500">#{f.id_feedback}</td>
-                    <td className="py-4"><span className={`text-[10px] font-black px-2 py-1 rounded uppercase ${f.tipo === 'BUG' ? 'bg-red-500/20 text-red-500' : f.tipo === 'IDEA' ? 'bg-amber-500/20 text-amber-500' : 'bg-cyan-500/20 text-cyan-500'}`}>{f.tipo}</span></td>
-                    <td className="py-4 font-bold text-slate-300">{f.usuario?.nombre_usuario || 'Anónimo'}</td>
-                    <td className="py-4 text-sm text-slate-400 max-w-xs truncate">{f.mensaje}</td>
-                    <td className="py-4 text-center"><button onClick={() => resolverFeedback(f.id_feedback, f.estado)} className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors ${f.estado === 'PENDIENTE' ? 'bg-slate-700 text-white hover:bg-emerald-600' : 'bg-emerald-500 text-white hover:bg-slate-600'}`}>{f.estado === 'PENDIENTE' ? 'Marcar Resuelto' : 'Resuelto ✓'}</button></td>
-                    <td className="py-4 text-right pr-2"><button onClick={() => eliminarRegistro('feedback', 'id_feedback', f.id_feedback)} className="text-red-500 font-bold p-2 hover:bg-red-500/10 rounded">Borrar</button></td>
-                  </tr>
-                ))}
+                    {tabActiva === "coches" && cochesFiltrados.map((carro) => (
+                      <tr key={carro.id_carro} className={`border-b border-slate-800/50 hover:bg-slate-800/30 ${carro.estado_aprobacion === 'PENDIENTE' ? 'bg-amber-900/10' : ''}`}>
+                        <td className="py-4 pl-2 text-slate-500">#{carro.id_carro}</td>
+                        <td className="py-4"><div className="font-bold text-white">{carro.modelo}</div><div className="text-xs text-slate-400 mt-1">{carro.marca?.marca || "Sin Marca"}</div></td>
+                        <td className="py-4">
+                          {carro.estado_aprobacion === 'PENDIENTE' ? <span className="bg-amber-500/20 text-amber-500 border border-amber-500/50 px-2 py-1 rounded text-[10px] font-bold uppercase animate-pulse">Pendiente</span> : <span className="bg-emerald-500/20 text-emerald-500 border border-emerald-500/50 px-2 py-1 rounded text-[10px] font-bold uppercase">Aprobado</span>}
+                        </td>
+                        <td className="py-4 text-center text-emerald-400 font-mono">${carro.valor}</td>
+                        <td className="py-4 text-right pr-2 space-x-2">
+                          <Link href={`/pieza/${carro.id_carro}`} target="_blank" className="text-cyan-400 font-bold p-2 hover:bg-cyan-900/30 rounded">Ver</Link>
+                          {carro.estado_aprobacion === 'PENDIENTE' && <button onClick={() => aprobarAuto(carro.id_carro)} className="text-emerald-400 font-bold p-2 hover:bg-emerald-900/30 rounded">Aprobar</button>}
+                          <button onClick={() => rechazarAuto(carro.id_carro)} className="text-red-400 font-bold p-2 hover:bg-red-900/30 rounded">{carro.estado_aprobacion === 'PENDIENTE' ? 'Rechazar' : 'Eliminar'}</button>
+                        </td>
+                      </tr>
+                    ))}
 
-                {miRol === 'SUPER_ADMIN' && tabActiva === "boletines" && boletinesFiltrados.map((bol) => (
-                  <tr key={bol.id_boletin} className="border-b border-red-900/30 hover:bg-red-900/10 transition-colors">
-                    <td className="py-4 pl-2 text-slate-500">#{bol.id_boletin}</td>
-                    <td className="py-4 font-black text-red-400">@{bol.comprador?.nombre_usuario || 'Anónimo'}</td>
-                    <td className="py-4 text-slate-300">@{bol.vendedor?.nombre_usuario || 'Desconocido'}</td>
-                    <td className="py-4">
-                      <div className="font-bold text-white bg-red-900/50 px-2 py-1 rounded w-fit border border-red-800">{bol.palabras_clave}</div>
-                      <div className="text-xs text-slate-500 mt-1 max-w-xs truncate">{bol.comentario_privado || 'Sin detalles extra'}</div>
-                    </td>
-                    <td className="py-4 text-right pr-2">
-                      <button onClick={() => eliminarRegistro('boletin_comprador', 'id_boletin', bol.id_boletin)} className="text-red-500 font-bold p-2 hover:bg-red-500/10 rounded transition-colors">Eliminar</button>
-                    </td>
-                  </tr>
-                ))}
+                    {miRol === 'SUPER_ADMIN' && tabActiva === "buzon" && feedbacksFiltrados.map((f) => (
+                      <tr key={f.id_feedback} className={`border-b border-slate-800/50 hover:bg-slate-800/30 ${f.estado === 'PENDIENTE' ? 'bg-indigo-900/10' : 'opacity-60'}`}>
+                        <td className="py-4 pl-2 text-slate-500">#{f.id_feedback}</td>
+                        <td className="py-4"><span className={`text-[10px] font-black px-2 py-1 rounded uppercase ${f.tipo === 'BUG' ? 'bg-red-500/20 text-red-500' : f.tipo === 'IDEA' ? 'bg-amber-500/20 text-amber-500' : 'bg-cyan-500/20 text-cyan-500'}`}>{f.tipo}</span></td>
+                        <td className="py-4 font-bold text-slate-300">{f.usuario?.nombre_usuario || 'Anónimo'}</td>
+                        <td className="py-4 text-sm text-slate-400 max-w-xs truncate">{f.mensaje}</td>
+                        <td className="py-4 text-center"><button onClick={() => resolverFeedback(f.id_feedback, f.estado)} className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors ${f.estado === 'PENDIENTE' ? 'bg-slate-700 text-white hover:bg-emerald-600' : 'bg-emerald-500 text-white hover:bg-slate-600'}`}>{f.estado === 'PENDIENTE' ? 'Marcar Resuelto' : 'Resuelto ✓'}</button></td>
+                        <td className="py-4 text-right pr-2"><button onClick={() => eliminarRegistro('feedback', 'id_feedback', f.id_feedback)} className="text-red-500 font-bold p-2 hover:bg-red-500/10 rounded">Borrar</button></td>
+                      </tr>
+                    ))}
 
-                {miRol === 'SUPER_ADMIN' && tabActiva === "reportes" && reportesFiltrados.map((r) => (
-                  <tr key={r.id_reporte} className={`border-b border-slate-800/50 hover:bg-slate-800/30 ${r.estado === 'PENDIENTE' ? 'bg-orange-900/10' : 'opacity-60'}`}>
-                    <td className="py-4 pl-2 text-slate-500">#{r.id_reporte}</td>
-                    <td className="py-4">
-                      <span className="bg-orange-500/20 text-orange-500 border border-orange-500/50 px-2 py-1 rounded text-[10px] font-bold uppercase">{r.motivo}</span>
-                    </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-2">
-                        {r.carro?.imagen_url ? <img src={r.carro.imagen_url} className="w-8 h-8 rounded object-cover" /> : <div className="w-8 h-8 bg-slate-800 rounded"></div>}
-                        <Link href={`/pieza/${r.carro?.id_carro}`} target="_blank" className="font-bold text-cyan-400 hover:underline">{r.carro?.modelo || 'Auto Eliminado'}</Link>
-                      </div>
-                    </td>
-                    <td className="py-4 text-sm text-slate-400 max-w-xs break-words">
-                      {r.comentario || 'Sin comentarios.'}<br/>
-                      <span className="text-[10px] text-slate-500 mt-1 block">Reportado por: @{r.usuario?.nombre_usuario || 'Desconocido'}</span>
-                    </td>
-                    <td className="py-4 text-center">
-                      <button onClick={() => resolverReporte(r.id_reporte)} disabled={r.estado === 'RESUELTO'} className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors ${r.estado === 'PENDIENTE' ? 'bg-slate-700 text-white hover:bg-emerald-600' : 'bg-emerald-500 text-white'}`}>
-                        {r.estado === 'PENDIENTE' ? 'Marcar Revisado' : 'Revisado ✓'}
-                      </button>
-                    </td>
-                    <td className="py-4 text-right pr-2">
-                      {r.carro && (
-                        <button onClick={() => rechazarAuto(r.carro.id_carro)} className="text-red-500 font-bold p-2 hover:bg-red-500/10 rounded">Borrar Auto</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                    {miRol === 'SUPER_ADMIN' && tabActiva === "boletines" && boletinesFiltrados.map((bol) => (
+                      <tr key={bol.id_boletin} className="border-b border-red-900/30 hover:bg-red-900/10 transition-colors">
+                        <td className="py-4 pl-2 text-slate-500">#{bol.id_boletin}</td>
+                        <td className="py-4 font-black text-red-400">@{bol.comprador?.nombre_usuario || 'Anónimo'}</td>
+                        <td className="py-4 text-slate-300">@{bol.vendedor?.nombre_usuario || 'Desconocido'}</td>
+                        <td className="py-4">
+                          <div className="font-bold text-white bg-red-900/50 px-2 py-1 rounded w-fit border border-red-800">{bol.palabras_clave}</div>
+                          <div className="text-xs text-slate-500 mt-1 max-w-xs truncate">{bol.comentario_privado || 'Sin detalles extra'}</div>
+                        </td>
+                        <td className="py-4 text-right pr-2">
+                          <button onClick={() => eliminarRegistro('boletin_comprador', 'id_boletin', bol.id_boletin)} className="text-red-500 font-bold p-2 hover:bg-red-500/10 rounded transition-colors">Eliminar</button>
+                        </td>
+                      </tr>
+                    ))}
 
-              </tbody>
-            </table>
-          </div>
+                    {miRol === 'SUPER_ADMIN' && tabActiva === "reportes" && reportesFiltrados.map((r) => (
+                      <tr key={r.id_reporte} className={`border-b border-slate-800/50 hover:bg-slate-800/30 ${r.estado === 'PENDIENTE' ? 'bg-orange-900/10' : 'opacity-60'}`}>
+                        <td className="py-4 pl-2 text-slate-500">#{r.id_reporte}</td>
+                        <td className="py-4">
+                          <span className="bg-orange-500/20 text-orange-500 border border-orange-500/50 px-2 py-1 rounded text-[10px] font-bold uppercase">{r.motivo}</span>
+                        </td>
+                        <td className="py-4">
+                          <div className="flex items-center gap-2">
+                            {r.carro?.imagen_url ? <img src={r.carro.imagen_url} className="w-8 h-8 rounded object-cover" /> : <div className="w-8 h-8 bg-slate-800 rounded"></div>}
+                            <Link href={`/pieza/${r.carro?.id_carro}`} target="_blank" className="font-bold text-cyan-400 hover:underline">{r.carro?.modelo || 'Auto Eliminado'}</Link>
+                          </div>
+                        </td>
+                        <td className="py-4 text-sm text-slate-400 max-w-xs break-words">
+                          {r.comentario || 'Sin comentarios.'}<br/>
+                          <span className="text-[10px] text-slate-500 mt-1 block">Reportado por: @{r.usuario?.nombre_usuario || 'Desconocido'}</span>
+                        </td>
+                        <td className="py-4 text-center">
+                          <button onClick={() => resolverReporte(r.id_reporte)} disabled={r.estado === 'RESUELTO'} className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors ${r.estado === 'PENDIENTE' ? 'bg-slate-700 text-white hover:bg-emerald-600' : 'bg-emerald-500 text-white'}`}>
+                            {r.estado === 'PENDIENTE' ? 'Marcar Revisado' : 'Revisado ✓'}
+                          </button>
+                        </td>
+                        <td className="py-4 text-right pr-2">
+                          {r.carro && (
+                            <button onClick={() => rechazarAuto(r.carro.id_carro)} className="text-red-500 font-bold p-2 hover:bg-red-500/10 rounded">Borrar Auto</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </main>
       </div>
 
+      {/* MODAL DE EDICIÓN / CREACIÓN */}
       {modalAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl w-full max-w-sm">
