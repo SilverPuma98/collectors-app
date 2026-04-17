@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-// Importamos tu motor de valuación
 import { calcularValorPremium } from "@/lib/premiumValuationEngine";
 
 export default function TabMotorIA() {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   
-  // ✨ NUEVO: Estados para el progreso del recálculo
   const [progresoRecalculo, setProgresoRecalculo] = useState<{ actual: number, total: number } | null>(null);
 
   const [fabricantes, setFabricantes] = useState<any[]>([]);
@@ -24,7 +22,6 @@ export default function TabMotorIA() {
   const [multMedia, setMultMedia] = useState("1.2");
   const [multBaja, setMultBaja] = useState("0.8");
 
-  // Estados Formularios Nuevos
   const [nuevaRareza, setNuevaRareza] = useState({ id_fab: "", rareza: "", mult: "1.0" });
   const [nuevaPres, setNuevaPres] = useState({ id_fab: "", presentacion: "", precio: "40" });
   const [nuevaCond, setNuevaCond] = useState({ estado: "", mult: "1.0" });
@@ -61,16 +58,12 @@ export default function TabMotorIA() {
     setCargando(false);
   };
 
-  // =======================================================================
-  // ⚡ LA GRAN FUNCIÓN: GUARDAR Y RECALCULAR TODA LA BÓVEDA
-  // =======================================================================
   const guardarCambiosMasivos = async () => {
     const confirmar = window.confirm("⚠️ Estás a punto de guardar estos parámetros y recalcular el valor de TODOS los autos en la plataforma. Este proceso puede tardar unos minutos. ¿Deseas continuar?");
     if (!confirmar) return;
 
     setGuardando(true);
     try {
-      // 1. Guardar Variables Globales
       await Promise.all([
         supabase.from('configuracion').update({ valor: parseFloat(apreciacion) || 0.08 }).eq('clave', 'apreciacion_anual'),
         supabase.from('configuracion').update({ valor: parseFloat(multAlta) || 1.4 }).eq('clave', 'demanda_alta'),
@@ -78,12 +71,10 @@ export default function TabMotorIA() {
         supabase.from('configuracion').update({ valor: parseFloat(multBaja) || 0.8 }).eq('clave', 'demanda_baja')
       ]);
 
-      // 2. Guardar Catálogos Actualizados
       for (const r of rarezas) await supabase.from('rareza').update({ multiplicador_rareza: parseFloat(r.multiplicador_rareza) || 1 }).eq('id_rareza', r.id_rareza);
       for (const p of presentaciones) await supabase.from('presentacion').update({ precio_base: parseFloat(p.precio_base) || 40 }).eq('id_presentacion', p.id_presentacion);
       for (const c of condiciones) await supabase.from('estado_carro').update({ multiplicador_estado: parseFloat(c.multiplicador_estado) || 1 }).eq('id_estado_carro', c.id_estado_carro);
       
-      // 3. 🚀 INICIAR RECÁLCULO MASIVO DE LA BÓVEDA
       await recalcularTodaLaBoveda();
 
     } catch (error) { 
@@ -95,7 +86,6 @@ export default function TabMotorIA() {
   };
 
   const recalcularTodaLaBoveda = async () => {
-    // Obtenemos todos los autos que NO son customs ni lotes (ya que la IA no valúa lotes y los customs tienen su propio precio base)
     const { data: todosLosAutos, error } = await supabase
       .from('carro')
       .select('id_carro, modelo, id_fabricante, id_rareza, id_presentacion, estado_carro, serie(anio)')
@@ -111,34 +101,24 @@ export default function TabMotorIA() {
     setProgresoRecalculo({ actual: 0, total: totalAutos });
 
     let actualizados = 0;
-    const tamañoLote = 25; // Procesaremos de 25 en 25 para no colapsar la BD
+    const tamañoLote = 25; 
 
     for (let i = 0; i < totalAutos; i += tamañoLote) {
       const lote = todosLosAutos.slice(i, i + tamañoLote);
       
-      // Preparamos las promesas de actualización para este lote
       const promesasDeActualizacion = lote.map(async (auto) => {
         const serieObj = Array.isArray(auto.serie) ? auto.serie[0] : auto.serie;
         const anio = serieObj?.anio || null;
 
-        // Pedimos el nuevo valor al motor
         const nuevoValorIA = await calcularValorPremium(
-          auto.modelo,
-          auto.id_fabricante,
-          auto.id_rareza,
-          auto.id_presentacion,
-          anio,
-          auto.estado_carro
+          auto.modelo, auto.id_fabricante, auto.id_rareza, auto.id_presentacion, anio, auto.estado_carro
         );
 
-        // Actualizamos en la BD
         return supabase.from('carro').update({ valor_calculado: nuevoValorIA }).eq('id_carro', auto.id_carro);
       });
 
-      // Ejecutamos el lote completo
       await Promise.all(promesasDeActualizacion);
       
-      // Actualizamos el progreso en pantalla
       actualizados += lote.length;
       setProgresoRecalculo({ actual: actualizados > totalAutos ? totalAutos : actualizados, total: totalAutos });
     }
@@ -147,7 +127,6 @@ export default function TabMotorIA() {
     setProgresoRecalculo(null);
     setGuardando(false);
   };
-  // =======================================================================
 
   // ================== FUNCIONES DE AGREGAR ==================
   const agregarRareza = async (e: React.FormEvent) => {
@@ -168,13 +147,36 @@ export default function TabMotorIA() {
     setNuevaCond({ estado: "", mult: "1.0" }); cargarParametros();
   };
 
+  // ✨ MAGIA DE INSERCIÓN MASIVA: Divide el texto por comas o saltos de línea
   const agregarHype = async (e: React.FormEvent) => {
     e.preventDefault();
-    await supabase.from('hype_keywords').insert([{ palabra_clave: nuevoHype.palabra.toLowerCase().trim(), nivel_demanda: nuevoHype.nivel }]);
-    setNuevoHype({ palabra: "", nivel: "ALTA" }); cargarParametros();
+    if (!nuevoHype.palabra.trim()) return;
+
+    // Separamos por comas o saltos de línea y limpiamos espacios vacíos
+    const palabrasArray = nuevoHype.palabra
+      .split(/[,;\n]+/)
+      .map(p => p.trim().toLowerCase())
+      .filter(p => p.length > 0);
+
+    if (palabrasArray.length === 0) return;
+
+    // Preparamos el bloque de datos para Supabase
+    const insertData = palabrasArray.map(p => ({
+      palabra_clave: p,
+      nivel_demanda: nuevoHype.nivel
+    }));
+
+    // Usamos upsert para evitar errores si alguna palabra ya existe
+    const { error } = await supabase.from('hype_keywords').upsert(insertData, { onConflict: 'palabra_clave', ignoreDuplicates: true });
+    
+    if (error) {
+      alert("Hubo un error al agregar las palabras.");
+    } else {
+      setNuevoHype({ palabra: "", nivel: "ALTA" }); 
+      cargarParametros();
+    }
   };
 
-  // ================== FUNCIONES DE ELIMINAR ==================
   const eliminarReg = async (tabla: string, columnaId: string, id: number) => {
     if(!window.confirm("¿Seguro que deseas eliminar este registro?")) return;
     await supabase.from(tabla).delete().eq(columnaId, id);
@@ -189,7 +191,6 @@ export default function TabMotorIA() {
       {/* HEADER STICKY */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 mb-8 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden sticky top-4 z-40">
         
-        {/* 📊 BARRA DE PROGRESO DE RECÁLCULO */}
         {progresoRecalculo && (
           <div className="absolute top-0 left-0 w-full h-1 bg-slate-800 z-50">
             <div 
@@ -342,14 +343,25 @@ export default function TabMotorIA() {
         {/* 4. DEMANDA / ETIQUETAS DE HYPE */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <h3 className="font-black text-slate-800 mb-4 flex items-center gap-2">🏷️ Asignación de Demanda</h3>
-          <p className="text-xs text-slate-500 mb-4">Clasifica palabras clave en niveles. El algoritmo usará el multiplicador global que definiste arriba según la caja a la que pertenezcan.</p>
+          <p className="text-xs text-slate-500 mb-4">Ingresa varias palabras separadas por comas. El algoritmo usará el multiplicador global según la caja a la que pertenezcan.</p>
           
-          <form onSubmit={agregarHype} className="flex gap-2 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
-            <input type="text" required placeholder="Palabra (Ej. skyline, bugatti...)" value={nuevoHype.palabra} onChange={e => setNuevoHype({...nuevoHype, palabra: e.target.value})} className="flex-1 bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs outline-none" />
-            <select value={nuevoHype.nivel} onChange={e => setNuevoHype({...nuevoHype, nivel: e.target.value})} className="w-24 bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs outline-none font-bold">
-              <option value="ALTA">Alta 🔥</option><option value="MEDIA">Media 📈</option><option value="BAJA">Baja 📉</option>
-            </select>
-            <button type="submit" className="bg-cyan-600 text-white px-3 py-1 rounded-lg text-xs font-bold">+</button>
+          <form onSubmit={agregarHype} className="flex flex-col sm:flex-row items-end gap-2 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="w-full sm:flex-1">
+              <textarea 
+                required 
+                placeholder="Ej. skyline, bugatti, mustang..." 
+                value={nuevoHype.palabra} 
+                onChange={e => setNuevoHype({...nuevoHype, palabra: e.target.value})} 
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs outline-none min-h-[40px] resize-y font-medium text-slate-700 leading-relaxed" 
+                rows={2}
+              />
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <select value={nuevoHype.nivel} onChange={e => setNuevoHype({...nuevoHype, nivel: e.target.value})} className="flex-1 sm:w-28 bg-white border border-slate-300 rounded-lg px-2 py-2 text-xs outline-none font-bold cursor-pointer h-10">
+                <option value="ALTA">Alta 🔥</option><option value="MEDIA">Media 📈</option><option value="BAJA">Baja 📉</option>
+              </select>
+              <button type="submit" className="bg-cyan-600 text-white px-4 py-2 rounded-lg text-xs font-bold h-10 shrink-0 shadow-sm hover:bg-cyan-500 transition-colors">Añadir</button>
+            </div>
           </form>
 
           <div className="max-h-[300px] overflow-y-auto pr-2 flex flex-wrap gap-2">
