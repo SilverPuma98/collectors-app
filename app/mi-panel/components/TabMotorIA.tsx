@@ -2,10 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+// Importamos tu motor de valuación
+import { calcularValorPremium } from "@/lib/premiumValuationEngine";
 
 export default function TabMotorIA() {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  
+  // ✨ NUEVO: Estados para el progreso del recálculo
+  const [progresoRecalculo, setProgresoRecalculo] = useState<{ actual: number, total: number } | null>(null);
 
   const [fabricantes, setFabricantes] = useState<any[]>([]);
   const [rarezas, setRarezas] = useState<any[]>([]);
@@ -23,7 +28,7 @@ export default function TabMotorIA() {
   const [nuevaRareza, setNuevaRareza] = useState({ id_fab: "", rareza: "", mult: "1.0" });
   const [nuevaPres, setNuevaPres] = useState({ id_fab: "", presentacion: "", precio: "40" });
   const [nuevaCond, setNuevaCond] = useState({ estado: "", mult: "1.0" });
-  const [nuevoHype, setNuevoHype] = useState({ palabra: "", nivel: "ALTA" }); // Ya no pide multiplicador
+  const [nuevoHype, setNuevoHype] = useState({ palabra: "", nivel: "ALTA" });
 
   useEffect(() => {
     cargarParametros();
@@ -56,10 +61,16 @@ export default function TabMotorIA() {
     setCargando(false);
   };
 
+  // =======================================================================
+  // ⚡ LA GRAN FUNCIÓN: GUARDAR Y RECALCULAR TODA LA BÓVEDA
+  // =======================================================================
   const guardarCambiosMasivos = async () => {
+    const confirmar = window.confirm("⚠️ Estás a punto de guardar estos parámetros y recalcular el valor de TODOS los autos en la plataforma. Este proceso puede tardar unos minutos. ¿Deseas continuar?");
+    if (!confirmar) return;
+
     setGuardando(true);
     try {
-      // Guardar Globales
+      // 1. Guardar Variables Globales
       await Promise.all([
         supabase.from('configuracion').update({ valor: parseFloat(apreciacion) || 0.08 }).eq('clave', 'apreciacion_anual'),
         supabase.from('configuracion').update({ valor: parseFloat(multAlta) || 1.4 }).eq('clave', 'demanda_alta'),
@@ -67,15 +78,76 @@ export default function TabMotorIA() {
         supabase.from('configuracion').update({ valor: parseFloat(multBaja) || 0.8 }).eq('clave', 'demanda_baja')
       ]);
 
-      // Guardar Catálogos
+      // 2. Guardar Catálogos Actualizados
       for (const r of rarezas) await supabase.from('rareza').update({ multiplicador_rareza: parseFloat(r.multiplicador_rareza) || 1 }).eq('id_rareza', r.id_rareza);
       for (const p of presentaciones) await supabase.from('presentacion').update({ precio_base: parseFloat(p.precio_base) || 40 }).eq('id_presentacion', p.id_presentacion);
       for (const c of condiciones) await supabase.from('estado_carro').update({ multiplicador_estado: parseFloat(c.multiplicador_estado) || 1 }).eq('id_estado_carro', c.id_estado_carro);
       
-      alert("✅ Parámetros guardados y actualizados en toda la plataforma.");
-    } catch (error) { alert("❌ Error al guardar."); }
+      // 3. 🚀 INICIAR RECÁLCULO MASIVO DE LA BÓVEDA
+      await recalcularTodaLaBoveda();
+
+    } catch (error) { 
+      console.error(error);
+      alert("❌ Hubo un error grave durante el proceso."); 
+      setGuardando(false);
+      setProgresoRecalculo(null);
+    }
+  };
+
+  const recalcularTodaLaBoveda = async () => {
+    // Obtenemos todos los autos que NO son customs ni lotes (ya que la IA no valúa lotes y los customs tienen su propio precio base)
+    const { data: todosLosAutos, error } = await supabase
+      .from('carro')
+      .select('id_carro, modelo, id_fabricante, id_rareza, id_presentacion, estado_carro, serie(anio)')
+      .eq('es_custom', false)
+      .eq('es_lote', false);
+
+    if (error || !todosLosAutos) {
+      alert("Error obteniendo autos para el recálculo.");
+      return;
+    }
+
+    const totalAutos = todosLosAutos.length;
+    setProgresoRecalculo({ actual: 0, total: totalAutos });
+
+    let actualizados = 0;
+    const tamañoLote = 25; // Procesaremos de 25 en 25 para no colapsar la BD
+
+    for (let i = 0; i < totalAutos; i += tamañoLote) {
+      const lote = todosLosAutos.slice(i, i + tamañoLote);
+      
+      // Preparamos las promesas de actualización para este lote
+      const promesasDeActualizacion = lote.map(async (auto) => {
+        const serieObj = Array.isArray(auto.serie) ? auto.serie[0] : auto.serie;
+        const anio = serieObj?.anio || null;
+
+        // Pedimos el nuevo valor al motor
+        const nuevoValorIA = await calcularValorPremium(
+          auto.modelo,
+          auto.id_fabricante,
+          auto.id_rareza,
+          auto.id_presentacion,
+          anio,
+          auto.estado_carro
+        );
+
+        // Actualizamos en la BD
+        return supabase.from('carro').update({ valor_calculado: nuevoValorIA }).eq('id_carro', auto.id_carro);
+      });
+
+      // Ejecutamos el lote completo
+      await Promise.all(promesasDeActualizacion);
+      
+      // Actualizamos el progreso en pantalla
+      actualizados += lote.length;
+      setProgresoRecalculo({ actual: actualizados > totalAutos ? totalAutos : actualizados, total: totalAutos });
+    }
+
+    alert(`✅ ¡Operación Exitosa! Se guardaron los parámetros y se actualizaron los valores IA de ${totalAutos} autos en la bóveda global.`);
+    setProgresoRecalculo(null);
     setGuardando(false);
   };
+  // =======================================================================
 
   // ================== FUNCIONES DE AGREGAR ==================
   const agregarRareza = async (e: React.FormEvent) => {
@@ -116,21 +188,38 @@ export default function TabMotorIA() {
       
       {/* HEADER STICKY */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 mb-8 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden sticky top-4 z-40">
+        
+        {/* 📊 BARRA DE PROGRESO DE RECÁLCULO */}
+        {progresoRecalculo && (
+          <div className="absolute top-0 left-0 w-full h-1 bg-slate-800 z-50">
+            <div 
+              className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-500"
+              style={{ width: `${(progresoRecalculo.actual / progresoRecalculo.total) * 100}%` }}
+            ></div>
+          </div>
+        )}
+
         <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div>
           <h2 className="text-2xl font-black text-amber-400 mb-2 flex items-center gap-2">🧠 Motor de Valuación IA</h2>
-          <p className="text-slate-400 text-sm">Ajusta los multiplicadores y la Calculadora PRO se actualizará al instante para todos los usuarios.</p>
+          {progresoRecalculo ? (
+            <p className="text-amber-400 text-sm font-bold animate-pulse">
+              Recalculando toda la bóveda... ({progresoRecalculo.actual} de {progresoRecalculo.total} autos procesados)
+            </p>
+          ) : (
+            <p className="text-slate-400 text-sm">Ajusta los multiplicadores y la Calculadora PRO se actualizará al instante para todos los usuarios.</p>
+          )}
         </div>
         <div className="flex shrink-0">
           <button onClick={guardarCambiosMasivos} disabled={guardando} className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-black px-8 py-3 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all disabled:opacity-50">
-            {guardando ? "Guardando..." : "💾 Guardar Todos los Ajustes"}
+            {guardando ? "Procesando Actualización Masiva..." : "💾 Guardar Ajustes y Recalcular Bóveda"}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-        {/* 0. CONFIGURACIONES GLOBALES (NUEVO) */}
+        {/* 0. CONFIGURACIONES GLOBALES */}
         <div className="lg:col-span-2 bg-slate-50 border border-slate-200 rounded-2xl p-6 shadow-sm">
           <h3 className="font-black text-slate-800 mb-4 flex items-center gap-2">🌍 Parámetros Globales</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
