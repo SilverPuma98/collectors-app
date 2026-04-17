@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import imageCompression from 'browser-image-compression';
 import BuscadorDesplegable from "./BuscadorDesplegable";
+// ✨ IMPORTAMOS EL NUEVO MOTOR PREMIUM
+import { calcularValorPremium } from "@/lib/premiumValuationEngine"; 
 
 export default function ModalPublicacion({
   miPerfil,
@@ -33,8 +35,7 @@ export default function ModalPublicacion({
   cargarDatosCentrales,
   setNuevosLogros,
   evaluarLogros,
-  calcularValorAproximado,
-  aniosDisponibles
+  aniosDisponibles // Quitamos calcularValorAproximado de aquí porque ya lo importamos arriba
 }: any) {
 
   const idFabAct = parseInt(nuevoCarro.id_fabricante) || null;
@@ -153,20 +154,22 @@ export default function ModalPublicacion({
     }
 
     const finalAnio = parseInt(nuevoCarro.anio_serie) || new Date().getFullYear();
-    const nombreEst = estadosCarro.find((e: any) => String(e.id_estado_carro) === String(nuevoCarro.id_estado_carro))?.estado_carro || "";
-    const nombreFab = fabricantes.find((f: any) => String(f.id_fabricante) === String(nuevoCarro.id_fabricante))?.fabricante || nuevoCarro.otro_fabricante;
+    const finalIdEstado = parseInt(nuevoCarro.id_estado_carro) || null;
     
-    const { data: rarData } = finalIdRareza ? await supabase.from('rareza').select('rareza').eq('id_rareza', finalIdRareza).single() : { data: null };
-    const nombreRarezaFinal = nuevoCarro.es_custom && nuevoCarro.rareza === 'nuevo' ? nuevoCarro.rareza_custom_texto : (rarData?.rareza || "");
-
-    const { data: presData } = finalIdPres ? await supabase.from('presentacion').select('presentacion').eq('id_presentacion', finalIdPres).single() : { data: null };
-    const nombrePresFinal = nuevoCarro.es_custom && nuevoCarro.id_presentacion === 'nuevo' ? nuevoCarro.otra_presentacion : (presData?.presentacion || "Individual Básico");
-    
+    // ✨ ACTUALIZACIÓN: Lógica de Precio IA usando el Motor Premium (Async)
     let sugeridoIA = 0;
     if (nuevoCarro.es_custom) {
       sugeridoIA = (parseFloat(nuevoCarro.valor_base) || 0) + (parseFloat(nuevoCarro.costo_materiales) || 0);
     } else if (!nuevoCarro.es_lote) {
-      sugeridoIA = calcularValorAproximado(nuevoCarro.modelo, nombreFab, nombreRarezaFinal, nombrePresFinal, finalAnio, nombreEst);
+      // Usamos el Motor Pro que consulta a Supabase
+      sugeridoIA = await calcularValorPremium(
+        nuevoCarro.modelo,
+        finalIdFab,
+        finalIdRareza,
+        finalIdPres,
+        finalAnio,
+        finalIdEstado
+      );
     }
 
     const payload: any = {
@@ -175,12 +178,11 @@ export default function ModalPublicacion({
       marca: finalIdMar, 
       serie: finalIdSer,  
       id_rareza: finalIdRareza || null, 
-      // ✨ MAGIA: Quitamos la columna 'rareza' para que Supabase ya no explote
       id_presentacion: finalIdPres || null, 
       valor: parseFloat(nuevoCarro.valor) || 0, 
       valor_calculado: sugeridoIA,
       escala: parseInt(nuevoCarro.id_escala) || null, 
-      estado_carro: parseInt(nuevoCarro.id_estado_carro) || null, 
+      estado_carro: finalIdEstado, 
       no_carro: parseInt(nuevoCarro.no_carro) || null, 
       para_cambio: nuevoCarro.para_cambio, 
       para_venta: nuevoCarro.para_venta,
