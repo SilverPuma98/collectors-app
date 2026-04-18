@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link"; 
-// ✨ IMPORTAMOS EL NUEVO CENTRO DE MANDO
 import TabMotorIA from "../mi-panel/components/TabMotorIA"; 
+import { calcularValorPremium } from "@/lib/premiumValuationEngine"; 
+import BuscadorDesplegable from "../mi-panel/components/BuscadorDesplegable";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -34,7 +35,11 @@ export default function AdminDashboard() {
   const [cargando, setCargando] = useState(false);
   const [itemEditando, setItemEditando] = useState<any>(null);
 
-  // ESTADOS DE FORMULARIOS
+  // GENERADOR DE AÑOS
+  const anioActual = new Date().getFullYear();
+  const aniosDisponiblesAdmin = Array.from({ length: anioActual - 1890 + 1 }, (_, i) => anioActual - i);
+
+  // ESTADOS DE FORMULARIOS BASE
   const [nuevaMarca, setNuevaMarca] = useState("");
   const [nuevoFabricante, setNuevoFabricante] = useState("");
   const [nuevaSerie, setNuevaSerie] = useState({ serie: "", anio: "", no_carros: "", id_fabricante: "" });
@@ -42,6 +47,18 @@ export default function AdminDashboard() {
   const [nuevaPresentacion, setNuevaPresentacion] = useState({ presentacion: "", id_fabricante: "" });
   const [nuevaEscala, setNuevaEscala] = useState("");
   const [nuevoEstadoCarro, setNuevoEstadoCarro] = useState("");
+
+  // ✨ ESTADO FORMULARIO DE COCHE
+  const [cocheForm, setCocheForm] = useState({
+    modelo: "", 
+    id_fabricante: "", otro_fabricante: "", 
+    marca: "", otra_marca: "", 
+    serie: "", otra_serie: "", 
+    id_rareza: "", otra_rareza: "", 
+    id_presentacion: "", otra_presentacion: "", 
+    escala: "", estado_carro: "", valor: "",
+    no_carro: "", total_carros: "", anio_serie: ""
+  });
 
   useEffect(() => {
     validarAcceso();
@@ -133,6 +150,35 @@ export default function AdminDashboard() {
     setModalAbierto(tipo);
   };
 
+  const abrirModalEditarCoche = async (id_carro: number) => {
+    const loader = document.getElementById(`loader-${id_carro}`);
+    if (loader) loader.classList.remove('hidden');
+
+    const { data: cocheBruto, error } = await supabase.from('carro').select('*, serie(*)').eq('id_carro', id_carro).single();
+    
+    if (loader) loader.classList.add('hidden');
+    if (error || !cocheBruto) { alert("Error cargando la base de datos de esta pieza."); return; }
+    
+    const serieObj = Array.isArray(cocheBruto.serie) ? cocheBruto.serie[0] : cocheBruto.serie;
+
+    setItemEditando(cocheBruto);
+    setCocheForm({
+      modelo: cocheBruto.modelo || "",
+      id_fabricante: String(cocheBruto.id_fabricante || ""), otro_fabricante: "",
+      marca: String(cocheBruto.marca || ""), otra_marca: "",
+      serie: String(cocheBruto.serie?.id_serie || ""), otra_serie: "",
+      id_rareza: String(cocheBruto.id_rareza || ""), otra_rareza: "",
+      id_presentacion: String(cocheBruto.id_presentacion || ""), otra_presentacion: "",
+      escala: String(cocheBruto.escala || ""),
+      estado_carro: String(cocheBruto.estado_carro || ""),
+      valor: String(cocheBruto.valor || ""),
+      no_carro: String(cocheBruto.no_carro || ""),
+      total_carros: String(serieObj?.no_carros || ""),
+      anio_serie: String(serieObj?.anio || "")
+    });
+    setModalAbierto('editar_coche');
+  };
+
   const guardarMarca = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); const { error } = itemEditando ? await supabase.from('marca').update({ marca: nuevaMarca }).eq('id_marca', itemEditando.id_marca) : await supabase.from('marca').insert([{ marca: nuevaMarca }]); if (error) alert("Error: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); };
   const guardarFabricante = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); const { error } = itemEditando ? await supabase.from('fabricante').update({ fabricante: nuevoFabricante }).eq('id_fabricante', itemEditando.id_fabricante) : await supabase.from('fabricante').insert([{ fabricante: nuevoFabricante }]); if (error) alert("Error: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); };
   const guardarSerie = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); const payload = { serie: nuevaSerie.serie, anio: parseInt(nuevaSerie.anio) || null, no_carros: parseInt(nuevaSerie.no_carros) || null, id_fabricante: parseInt(nuevaSerie.id_fabricante) }; const { error } = itemEditando ? await supabase.from('serie').update(payload).eq('id_serie', itemEditando.id_serie) : await supabase.from('serie').insert([payload]); if (error) alert("Error: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); };
@@ -140,6 +186,72 @@ export default function AdminDashboard() {
   const guardarPresentacion = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); const payload = { presentacion: nuevaPresentacion.presentacion, id_fabricante: parseInt(nuevaPresentacion.id_fabricante) }; const { error } = itemEditando ? await supabase.from('presentacion').update(payload).eq('id_presentacion', itemEditando.id_presentacion) : await supabase.from('presentacion').insert([payload]); if (error) alert("Error: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); };
   const guardarEscala = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); const { error } = itemEditando ? await supabase.from('escala').update({ escala: nuevaEscala }).eq('id_escala', itemEditando.id_escala) : await supabase.from('escala').insert([{ escala: nuevaEscala }]); if (error) alert("Error: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); };
   const guardarEstadoCarro = async (e: React.FormEvent) => { e.preventDefault(); setCargando(true); const { error } = itemEditando ? await supabase.from('estado_carro').update({ estado_carro: nuevoEstadoCarro }).eq('id_estado_carro', itemEditando.id_estado_carro) : await supabase.from('estado_carro').insert([{ estado_carro: nuevoEstadoCarro }]); if (error) alert("Error: " + error.message); else { await cargarTodosLosDatos(miRol); setModalAbierto(null); } setCargando(false); };
+
+  const crearSiEsNuevo = async (tabla: string, columna: string, idSeleccionado: string, valorNuevo: string, extraData: any = {}) => {
+    if (idSeleccionado !== "nuevo") return parseInt(idSeleccionado) || null;
+    if (!valorNuevo) return null;
+    const existente = await supabase.from(tabla).select(`id_${tabla}`).ilike(columna, valorNuevo).single();
+    if (existente.data) return (existente.data as Record<string, any>)[`id_${tabla}`];
+    const { data } = await supabase.from(tabla).insert([{ [columna]: valorNuevo, ...extraData }]).select().single();
+    return data ? (data as Record<string, any>)[`id_${tabla}`] : null;
+  };
+
+  const guardarCocheAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCargando(true);
+
+    let finalIdFab = await crearSiEsNuevo('fabricante', 'fabricante', cocheForm.id_fabricante, cocheForm.otro_fabricante);
+    let finalIdMar = await crearSiEsNuevo('marca', 'marca', cocheForm.marca, cocheForm.otra_marca);
+    
+    let finalIdSer = await crearSiEsNuevo('serie', 'serie', cocheForm.serie, cocheForm.otra_serie, { 
+      id_fabricante: finalIdFab,
+      anio: parseInt(cocheForm.anio_serie) || null,
+      no_carros: parseInt(cocheForm.total_carros) || null 
+    });
+
+    if (finalIdSer && cocheForm.serie !== "nuevo") {
+      await supabase.from('serie').update({
+        anio: parseInt(cocheForm.anio_serie) || null, 
+        no_carros: parseInt(cocheForm.total_carros) || null, 
+        id_fabricante: finalIdFab
+      }).eq('id_serie', finalIdSer);
+    }
+
+    let finalIdPres = await crearSiEsNuevo('presentacion', 'presentacion', cocheForm.id_presentacion, cocheForm.otra_presentacion, { id_fabricante: finalIdFab });
+    let finalIdRareza = await crearSiEsNuevo('rareza', 'rareza', cocheForm.id_rareza, cocheForm.otra_rareza, { id_fabricante: finalIdFab });
+
+    const payload: any = {
+      modelo: cocheForm.modelo,
+      id_fabricante: finalIdFab,
+      marca: finalIdMar,
+      serie: finalIdSer,
+      id_rareza: finalIdRareza,
+      id_presentacion: finalIdPres,
+      escala: parseInt(cocheForm.escala) || null,
+      estado_carro: parseInt(cocheForm.estado_carro) || null,
+      valor: parseFloat(cocheForm.valor) || 0,
+      no_carro: parseInt(cocheForm.no_carro) || null
+    };
+
+    if (!itemEditando.es_custom && !itemEditando.es_lote) {
+      const anioSeleccionado = parseInt(cocheForm.anio_serie) || null;
+      const nuevoValorIA = await calcularValorPremium(
+        payload.modelo, payload.id_fabricante, payload.id_rareza, payload.id_presentacion, anioSeleccionado, payload.estado_carro
+      );
+      payload.valor_calculado = nuevoValorIA;
+    }
+
+    const { error } = await supabase.from('carro').update(payload).eq('id_carro', itemEditando.id_carro);
+    
+    setCargando(false);
+    if (error) {
+      alert("Error al actualizar la pieza: " + error.message);
+    } else {
+      alert("✅ Auto actualizado. Se ajustaron los datos de catálogo y se recalculó su valor IA.");
+      setModalAbierto(null);
+      cargarTodosLosDatos(miRol);
+    }
+  };
 
   const eliminarRegistro = async (tabla: string, columnaId: string, id: number) => {
     if (miRol !== 'SUPER_ADMIN') { alert("Solo los Súper Administradores pueden eliminar."); return; }
@@ -184,6 +296,18 @@ export default function AdminDashboard() {
 
   if (!autorizado) return <div className="flex h-screen items-center justify-center text-cyan-500 animate-pulse font-bold">VERIFICANDO NIVEL DE ACCESO...</div>;
 
+  const idFabAct = parseInt(cocheForm.id_fabricante) || null;
+  const seriesFiltradasCarro = idFabAct ? series.filter((s: any) => s.id_fabricante === idFabAct) : series;
+  const rarezasFiltradasCarro = idFabAct ? rarezas.filter((r: any) => r.id_fabricante === idFabAct) : rarezas;
+  const presentacionesFiltradasCarro = idFabAct ? presentaciones.filter((p: any) => p.id_fabricante === idFabAct) : presentaciones; 
+
+  // ✨ CORRECCIÓN DE TYPESCRIPT: Convertimos todo explícitamente a String
+  const opcionesFabricante = fabricantes.map((f: any) => ({ id: String(f.id_fabricante), label: String(f.fabricante) }));
+  const opcionesMarca = marcas.map((m: any) => ({ id: String(m.id_marca), label: String(m.marca) }));
+  const opcionesSerie = seriesFiltradasCarro.map((s: any) => ({ id: String(s.id_serie), label: String(`${s.serie} ${s.anio ? `(${s.anio})` : ''}`) }));
+  const opcionesRareza = rarezasFiltradasCarro.map((r: any) => ({ id: String(r.id_rareza), label: String(r.rareza) }));
+  const opcionesPresentacion = presentacionesFiltradasCarro.map((p: any) => ({ id: String(p.id_presentacion), label: String(p.presentacion) })); 
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-12 w-full relative">
       <header className="mb-8 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
@@ -214,7 +338,6 @@ export default function AdminDashboard() {
 
           {miRol === 'SUPER_ADMIN' && (
             <>
-              {/* ✨ NUEVO BOTÓN: MOTOR IA */}
               <button onClick={() => setTabActiva("motoria")} className={`whitespace-nowrap mt-2 text-left px-4 py-3 rounded-lg font-bold transition-colors flex items-center justify-between shadow-md ${tabActiva === "motoria" ? "bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-amber-500/30" : "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border border-amber-500/20"}`}>
                 <span className="flex items-center gap-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Motor IA Pro</span>
               </button>
@@ -246,7 +369,6 @@ export default function AdminDashboard() {
 
         <main className="lg:col-span-4 bg-[#0b1120] border border-slate-800 rounded-2xl p-4 md:p-6 shadow-xl min-h-[500px] overflow-hidden">
           
-          {/* ✨ RENDERIZAMOS EL MOTOR IA SI ESTÁ ACTIVO (SIN BUSCADOR ARRIBA) */}
           {tabActiva === "motoria" ? (
             <TabMotorIA />
           ) : (
@@ -321,6 +443,10 @@ export default function AdminDashboard() {
                         <td className="py-4 text-center text-emerald-400 font-mono">${carro.valor}</td>
                         <td className="py-4 text-right pr-2 space-x-2">
                           <Link href={`/pieza/${carro.id_carro}`} target="_blank" className="text-cyan-400 font-bold p-2 hover:bg-cyan-900/30 rounded">Ver</Link>
+                          <button onClick={() => abrirModalEditarCoche(carro.id_carro)} className="text-amber-400 font-bold p-2 hover:bg-amber-900/30 rounded relative">
+                            Editar<span id={`loader-${carro.id_carro}`} className="hidden absolute top-0 right-0 w-2 h-2 bg-amber-400 rounded-full animate-ping"></span>
+                          </button>
+                          
                           {carro.estado_aprobacion === 'PENDIENTE' && <button onClick={() => aprobarAuto(carro.id_carro)} className="text-emerald-400 font-bold p-2 hover:bg-emerald-900/30 rounded">Aprobar</button>}
                           <button onClick={() => rechazarAuto(carro.id_carro)} className="text-red-400 font-bold p-2 hover:bg-red-900/30 rounded">{carro.estado_aprobacion === 'PENDIENTE' ? 'Rechazar' : 'Eliminar'}</button>
                         </td>
@@ -374,9 +500,14 @@ export default function AdminDashboard() {
                             {r.estado === 'PENDIENTE' ? 'Marcar Revisado' : 'Revisado ✓'}
                           </button>
                         </td>
-                        <td className="py-4 text-right pr-2">
+                        <td className="py-4 text-right pr-2 space-x-2">
                           {r.carro && (
-                            <button onClick={() => rechazarAuto(r.carro.id_carro)} className="text-red-500 font-bold p-2 hover:bg-red-500/10 rounded">Borrar Auto</button>
+                            <>
+                              <button onClick={() => abrirModalEditarCoche(r.carro.id_carro)} className="text-amber-400 font-bold p-2 hover:bg-amber-500/10 rounded relative">
+                                Editar Auto<span id={`loader-${r.carro.id_carro}`} className="hidden absolute top-0 right-0 w-2 h-2 bg-amber-400 rounded-full animate-ping"></span>
+                              </button>
+                              <button onClick={() => rechazarAuto(r.carro.id_carro)} className="text-red-500 font-bold p-2 hover:bg-red-500/10 rounded">Borrar Auto</button>
+                            </>
                           )}
                         </td>
                       </tr>
@@ -393,8 +524,10 @@ export default function AdminDashboard() {
       {/* MODAL DE EDICIÓN / CREACIÓN */}
       {modalAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
-          <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl w-full max-w-sm">
-            <h3 className="text-lg font-bold text-white mb-4 capitalize">{itemEditando ? `Editar ${modalAbierto}` : `Nuevo ${modalAbierto}`}</h3>
+          <div className={`bg-slate-900 border border-slate-700 p-6 rounded-xl w-full ${modalAbierto === 'editar_coche' ? 'max-w-lg overflow-y-auto max-h-[90vh]' : 'max-w-sm'}`}>
+            <h3 className="text-lg font-bold text-white mb-4 capitalize">
+              {modalAbierto === 'editar_coche' ? '🛠️ Editar Coche (Modo Admin)' : (itemEditando ? `Editar ${modalAbierto}` : `Nuevo ${modalAbierto}`)}
+            </h3>
             
             <form onSubmit={(e) => {
               if (modalAbierto === 'marca') guardarMarca(e);
@@ -404,8 +537,126 @@ export default function AdminDashboard() {
               else if (modalAbierto === 'presentacion') guardarPresentacion(e);
               else if (modalAbierto === 'escala') guardarEscala(e);
               else if (modalAbierto === 'estado') guardarEstadoCarro(e);
+              else if (modalAbierto === 'editar_coche') guardarCocheAdmin(e);
             }} className="flex flex-col gap-4">
               
+              {/* ✨ MODAL ESPECIAL PARA EDITAR COCHES CON BUSCADOR DINÁMICO */}
+              {modalAbierto === 'editar_coche' && (
+                <div className="space-y-4 pb-4">
+                  {itemEditando?.es_custom && <p className="text-amber-500 text-[10px] mb-2 bg-amber-500/10 p-2 rounded">⚠️ Esta es una pieza custom. Al guardar, se actualizarán los registros base, pero la IA ignorará el recálculo (los customs mantienen su precio asignado).</p>}
+                  
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Modelo *</label>
+                    <input type="text" placeholder="Modelo de la Pieza" value={cocheForm.modelo} onChange={e => setCocheForm({...cocheForm, modelo: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-3 py-2 outline-none text-sm" required />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="relative z-50">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Fabricante</label>
+                      <BuscadorDesplegable 
+                        opciones={opcionesFabricante} 
+                        valorSeleccionado={cocheForm.id_fabricante} 
+                        onSelect={(id: string, text: string) => setCocheForm({...cocheForm, id_fabricante: id, otro_fabricante: text, id_rareza: "", id_presentacion: "", serie: ""})} 
+                        placeholder="Buscar o crear..." 
+                        permiteNuevo={true} 
+                      />
+                    </div>
+                    <div className="relative z-40">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Marca de Auto</label>
+                      <BuscadorDesplegable 
+                        opciones={opcionesMarca} 
+                        valorSeleccionado={cocheForm.marca} 
+                        onSelect={(id: string, text: string) => setCocheForm({...cocheForm, marca: id, otra_marca: text})} 
+                        placeholder="Buscar o crear..." 
+                        permiteNuevo={true} 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="relative z-30">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Serie</label>
+                      <BuscadorDesplegable 
+                        opciones={opcionesSerie} 
+                        valorSeleccionado={cocheForm.serie} 
+                        onSelect={(id: string, text: string) => setCocheForm({...cocheForm, serie: id, otra_serie: text})} 
+                        placeholder="Buscar o crear..." 
+                        permiteNuevo={true} 
+                        disabled={!idFabAct}
+                      />
+                    </div>
+                    <div className="relative z-20">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Rareza</label>
+                      <BuscadorDesplegable 
+                        opciones={opcionesRareza} 
+                        valorSeleccionado={cocheForm.id_rareza} 
+                        onSelect={(id: string, text: string) => setCocheForm({...cocheForm, id_rareza: id, otra_rareza: text})} 
+                        placeholder="Buscar o crear..." 
+                        permiteNuevo={true} 
+                        disabled={!idFabAct}
+                      />
+                    </div>
+                  </div>
+
+                  {/* ✨ NUEVO BLOQUE: NO, TOTAL Y AÑO */}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 mt-2">
+                    <div className="sm:col-span-4 flex gap-2">
+                      <div className="w-1/2">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">No.</label>
+                        <input type="number" placeholder="3" value={cocheForm.no_carro} onChange={e => setCocheForm({...cocheForm, no_carro: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-2.5 outline-none text-xs h-[42px]" />
+                      </div>
+                      <div className="flex items-center pt-5 text-slate-500 font-bold">/</div>
+                      <div className="w-1/2">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Total</label>
+                        <input type="number" placeholder="10" value={cocheForm.total_carros} onChange={e => setCocheForm({...cocheForm, total_carros: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-2.5 outline-none text-xs h-[42px]" />
+                      </div>
+                    </div>
+                    <div className="sm:col-span-8 relative z-15">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Año de la Serie</label>
+                      <select value={cocheForm.anio_serie} onChange={e => setCocheForm({...cocheForm, anio_serie: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-2.5 outline-none text-xs cursor-pointer h-[42px]">
+                        <option value="">-- Seleccionar Año --</option>
+                        {aniosDisponiblesAdmin.map((anio: number) => <option key={anio} value={anio}>{anio}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div className="relative z-10">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Empaque</label>
+                      <BuscadorDesplegable 
+                        opciones={opcionesPresentacion} 
+                        valorSeleccionado={cocheForm.id_presentacion} 
+                        onSelect={(id: string, text: string) => setCocheForm({...cocheForm, id_presentacion: id, otra_presentacion: text})} 
+                        placeholder="Buscar o crear..." 
+                        permiteNuevo={true} 
+                        disabled={!idFabAct}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Estado Físico</label>
+                      <select value={cocheForm.estado_carro} onChange={e => setCocheForm({...cocheForm, estado_carro: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-2.5 outline-none text-xs h-[42px]">
+                        <option value="">-- Seleccionar --</option>
+                        {estadosCarro.map(e => <option key={e.id_estado_carro} value={e.id_estado_carro}>{e.estado_carro}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Escala</label>
+                      <select value={cocheForm.escala} onChange={e => setCocheForm({...cocheForm, escala: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-2.5 outline-none text-xs h-[42px]">
+                        <option value="">-- Seleccionar --</option>
+                        {escalas.map(e => <option key={e.id_escala} value={e.id_escala}>{e.escala}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Valor ($)</label>
+                      <input type="number" placeholder="Valor" value={cocheForm.valor} onChange={e => setCocheForm({...cocheForm, valor: e.target.value})} className="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-bold rounded-lg px-4 py-2.5 outline-none text-sm h-[42px]" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {modalAbierto === 'marca' && <input type="text" required placeholder="Nombre de la marca" value={nuevaMarca} onChange={(e) => setNuevaMarca(e.target.value)} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none" />}
               {modalAbierto === 'fabricante' && <input type="text" required placeholder="Nombre del fabricante" value={nuevoFabricante} onChange={(e) => setNuevoFabricante(e.target.value)} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none" />}
               {modalAbierto === 'escala' && <input type="text" required placeholder="Ej: 1:64" value={nuevaEscala} onChange={(e) => setNuevaEscala(e.target.value)} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none" />}
@@ -445,9 +696,9 @@ export default function AdminDashboard() {
                 </>
               )}
 
-              <div className="flex justify-end gap-3 mt-4">
+              <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-800">
                 <button type="button" onClick={() => setModalAbierto(null)} className="text-slate-400 p-2 font-bold hover:text-white transition-colors">Cancelar</button>
-                <button type="submit" disabled={cargando} className="bg-cyan-700 hover:bg-cyan-600 text-white px-4 py-2 rounded-md font-bold transition-colors">{cargando ? "Guardando..." : "Guardar"}</button>
+                <button type="submit" disabled={cargando} className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2 rounded-lg font-bold transition-colors shadow-lg">{cargando ? "Guardando..." : "Guardar Cambios"}</button>
               </div>
             </form>
           </div>
