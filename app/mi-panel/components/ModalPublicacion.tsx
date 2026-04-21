@@ -35,7 +35,7 @@ export default function ModalPublicacion({
   cargarDatosCentrales,
   setNuevosLogros,
   evaluarLogros,
-  aniosDisponibles // Quitamos calcularValorAproximado de aquí porque ya lo importamos arriba
+  aniosDisponibles
 }: any) {
 
   const idFabAct = parseInt(nuevoCarro.id_fabricante) || null;
@@ -280,7 +280,8 @@ export default function ModalPublicacion({
         <form onSubmit={guardarCarro} className="p-6 flex flex-col gap-6">
           
           <div className="w-full">
-            <input type="file" accept="image/*" capture="environment" id="foto-carro" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if(f){ setFotoArchivoCarro(f); setFotoPreviewCarro(URL.createObjectURL(f)); } }} />
+            {/* ✨ ELIMINAMOS capture="environment" AQUÍ */}
+            <input type="file" accept="image/*" id="foto-carro" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if(f){ setFotoArchivoCarro(f); setFotoPreviewCarro(URL.createObjectURL(f)); } }} />
             <label htmlFor="foto-carro" className={`w-full aspect-[4/3] sm:aspect-video rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group shadow-inner ${fotoPreviewCarro ? 'border-cyan-300' : 'border-slate-300 hover:border-cyan-400 bg-slate-50'}`}>
               {fotoPreviewCarro ? (
                 <><img src={fotoPreviewCarro} alt="Preview" className="w-full h-full object-cover" /><div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity"><span className="text-white font-bold text-sm bg-black/50 px-4 py-1.5 rounded-full">Cambiar Foto Principal</span></div></>
